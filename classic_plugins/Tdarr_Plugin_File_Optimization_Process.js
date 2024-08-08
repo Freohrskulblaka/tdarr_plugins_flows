@@ -1,115 +1,3 @@
-// Version: 1.0
-// This will have the details of the plugin.
-function details() {
-    let plugin_details = {
-        id: "Tdarr_Plugin_File_Optimization_Process",
-        Name: "File Optimization Process",
-        Stage: "Pre-processing",
-        Type: "Video, Audio, Subtitle",
-        Operation: "Transcode",
-        Description: "This plugin will handle the file optimization process.",
-        Version: "1.0",
-        Tags: "pre-processing, ffmpeg, configurable",
-        Inputs: []
-    };
-
-    // Add the Target File Container input to the plugin details.
-    let TargetFileContainer = {
-        label: 'Target File Container',
-        name: 'targetFileContainer',        
-        type: 'string',
-        defaultValue: 'mkv',
-        inputUI: { type: 'dropdown', options: ['mkv', 'mp4'] },
-        tooltip: "Select the file container. If the file is not in the selected container, it will be converted to the selected container, with compatible settings."
-    };
-
-    // Basic file cleanup.
-    let BasicFileCleanup = {
-        label: 'Basic File Cleanup',
-        name: 'basicFileCleanup',
-        type: 'boolean',
-        defaultValue: true,
-        inputUI: { type: 'dropdown', options: ['false', 'true'] },
-        tooltip: `Here are the basic file cleanup that is carried out. \\n
-        - Removes Image Streams from the file. \\n
-        - Removes Attachments except for fonts. \\n
-        - Removes file Title, Video Title.`
-    };
-
-    // Lets perform advanced file cleanup. This includes removing unwanted language streams and subtitles.
-    // it also includes removing unwanted audio channels, and subtitle types.
-    let AdvancedFileCleanup = {
-        label: 'Advanced File Cleanup',
-        name: 'advancedFileCleanup',
-        type: 'boolean',
-        defaultValue: true,
-        inputUI: { type: 'dropdown', options: ['false', 'true'] },
-        tooltip: `Here are the advanced file cleanup that is carried out. \\n
-        - Removes unwanted audio streams from the file. \\n
-        - Removes unwanted subtitle streams from the file.\\n
-        - Removes unwanted audio channels from the file. \\n
-        - Removes commentaries from the file. \\n
-        - Tag Audio and Subtitle streams that are missing language tags with the first value in the language list.`
-    };
-
-    // Add the Audio Language List input to the plugin details.
-    let AudioLanguageList = {
-        label: 'Audio Language List',
-        name: 'audioLangList',
-        type: 'string',
-        defaultValue: 'eng, spa, jpn',
-        inputUI: { type: 'text' },
-        tooltip: `List of languagues that will be kept. The first value will be used to tag audio tracks that are missing language tags.\\n
-        Example (keep this list):\\n
-        eng, jpn`
-    };
-
-    // Add the Subtitle Language List input to the plugin details.
-    let SubtitleLanguageList = {
-        label: 'Subtitle Language List',
-        name: 'subtitleLangList',
-        type: 'string',
-        defaultValue: 'eng, spa',
-        inputUI: { type: 'text' },
-        tooltip: `List of languagues that will be kept. The first value will be used to tag subtitle tracks that are missing language tags.\\n
-        Example (keep this list):\\n
-        eng, spa`
-    };
-
-    // Add the AudioChannelList input to the plugin details.
-    let AudioChannelList = {
-        label: 'Audio Channel List',
-        name: 'audioChannelList',
-        type: 'string',
-        defaultValue: '7.1, 5.1, 2.0',
-        // The options will let you keep all channels including 7.1 and bellow. It can also do 5.1 and bellow, or just 7.1, 5.1, or 2.0.
-        inputUI: { type: 'dropdown', options: ['7.1, 5.1, 2.0', '5.1, 2.0', '7.1', '5.1', '2.0'] },
-        tooltip: `List of audio channels that will be kept. \\n
-        - It can keep all channels including 7.1 and bellow. 
-        - It can also do 5.1 and bellow, or just 7.1, 5.1, or 2.0.`
-    };
-
-    // Add the AddChapters input to the plugin details.
-    let AddChapters = {
-        label: 'Add Chapter Markers',
-        name: 'addChapterMarkers',
-        type: 'boolean',
-        defaultValue: true,
-        inputUI: { type: 'dropdown', options: ['false', 'true'] },
-        tooltip: `Add chapter markers to the file if it does not have any.`
-    };
-
-    plugin_details.Inputs.push(TargetFileContainer);
-    plugin_details.Inputs.push(BasicFileCleanup);
-    plugin_details.Inputs.push(AdvancedFileCleanup);
-    plugin_details.Inputs.push(AudioLanguageList);
-    plugin_details.Inputs.push(SubtitleLanguageList);
-    plugin_details.Inputs.push(AudioChannelList);
-    plugin_details.Inputs.push(AddChapters);
-
-    return plugin_details;
-};
-
 // Sample object of what a file looks like after the ffmpeg probe has run.
 let file = {
     "_id": "/mnt/media/staging/Tdarr/The Bible (2013) - [imdbid-tt2245988] - [tvdbid-265720]/Season 01/The Bible (2013) - S01E05 - Passion - ([Bluray-1080p][DTS 5.1][x264][8 bits][EN+ES+FR]).mkv",
@@ -623,10 +511,128 @@ let file = {
         }
       ]
     }
-  };
+};
 
+// Required modules
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const { execSync } = require('child_process');
 
-// This will be the main plugin function.
+// This plugin goes through my file optimization process.
+function details() {
+    let plugin_details = {
+        id: "Tdarr_Plugin_File_Optimization_Process",
+        Name: "File Optimization Process",
+        Stage: "Pre-processing",
+        Type: "Video, Audio, Subtitle",
+        Operation: "Transcode",
+        Description: `This plugin goes through my file optimization process. 
+        The process is made up of the following steps: First, File Cleanup: This step removes Image Streams from the file, removes Attachments except for fonts, and removes file Title and Video Title. 
+        Next, Advanced File Cleanup: This step removes unwanted audio streams from the file, removes unwanted subtitle streams from the file, removes unwanted audio channels from the file, removes commentaries from the file, and tags Audio and Subtitle Streams that are missing Language Tags. 
+        Finally, the process adds Chapter Markers.`,
+        Version: "1.0",
+        Tags: "pre-processing, ffmpeg, configurable",
+        Inputs: []
+    };
+
+    // Add the Target File Container input to the plugin details.
+    let TargetFileContainer = {
+        label: 'Target File Container',
+        name: 'targetFileContainer',        
+        type: 'string',
+        defaultValue: 'mkv',
+        inputUI: { type: 'dropdown', options: ['mkv', 'mp4'] },
+        tooltip: "Select the file container. If the file is not in the selected container, it will be converted to the selected container, with compatible settings."
+    };
+
+    // Basic file cleanup.
+    let BasicFileCleanup = {
+        label: 'Basic File Cleanup',
+        name: 'basicFileCleanup',
+        type: 'boolean',
+        defaultValue: true,
+        inputUI: { type: 'dropdown', options: ['false', 'true'] },
+        tooltip: `Here are the basic file cleanup that is carried out. \\n
+        - Removes Image Streams from the file. \\n
+        - Removes Attachments except for fonts. \\n
+        - Removes file Title, Video Title.`
+    };
+
+    // Lets perform advanced file cleanup. This includes removing unwanted language streams and subtitles.
+    // it also includes removing unwanted audio channels, and subtitle types.
+    let AdvancedFileCleanup = {
+        label: 'Advanced File Cleanup',
+        name: 'advancedFileCleanup',
+        type: 'boolean',
+        defaultValue: true,
+        inputUI: { type: 'dropdown', options: ['false', 'true'] },
+        tooltip: `Here are the advanced file cleanup that is carried out. \\n
+        - Removes unwanted audio streams from the file. \\n
+        - Removes unwanted subtitle streams from the file.\\n
+        - Removes commentaries from the file. \\n
+        - Tag Audio and Subtitle streams that are missing language tags with the first value in the language list.`
+    };
+
+    // Add the Audio Language List input to the plugin details.
+    let AudioLanguageList = {
+        label: 'Audio Language List',
+        name: 'audioLangList',
+        type: 'string',
+        defaultValue: 'eng, spa, jpn',
+        inputUI: { type: 'text' },
+        tooltip: `List of languagues that will be kept. The first value will be used to tag audio tracks that are missing language tags.\\n
+        Example (keep this list):\\n
+        eng, jpn`
+    };
+
+    // Add the Subtitle Language List input to the plugin details.
+    let SubtitleLanguageList = {
+        label: 'Subtitle Language List',
+        name: 'subtitleLangList',
+        type: 'string',
+        defaultValue: 'eng, spa',
+        inputUI: { type: 'text' },
+        tooltip: `List of languagues that will be kept. The first value will be used to tag subtitle tracks that are missing language tags.\\n
+        Example (keep this list):\\n
+        eng, spa`
+    };
+
+    // Add the AudioChannelList input to the plugin details.
+    let AudioChannelList = {
+        label: 'Audio Channel List',
+        name: 'audioChannelList',
+        type: 'string',
+        defaultValue: '7.1, 5.1, 2.0',
+        // The options will let you keep all channels including 7.1 and bellow. It can also do 5.1 and bellow, or just 7.1, 5.1, or 2.0.
+        inputUI: { type: 'dropdown', options: ['7.1, 5.1, 2.0', '5.1, 2.0', '7.1', '5.1', '2.0'] },
+        tooltip: `List of audio channels that will be kept. \\n
+        - It can keep all channels including 7.1 and bellow. 
+        - It can also do 5.1 and bellow, or just 7.1, 5.1, or 2.0.`
+    };
+
+    // Add the AddChapters input to the plugin details.
+    let AddChapters = {
+        label: 'Add Chapter Markers',
+        name: 'addChapterMarkers',
+        type: 'boolean',
+        defaultValue: true,
+        inputUI: { type: 'dropdown', options: ['false', 'true'] },
+        tooltip: `Add chapter markers to the file if it does not have any.`
+    };
+
+    plugin_details.Inputs.push(TargetFileContainer);
+    plugin_details.Inputs.push(BasicFileCleanup);
+    plugin_details.Inputs.push(AdvancedFileCleanup);
+    plugin_details.Inputs.push(AudioLanguageList);
+    plugin_details.Inputs.push(SubtitleLanguageList);
+    plugin_details.Inputs.push(AudioChannelList);
+    plugin_details.Inputs.push(AddChapters);
+
+    return plugin_details;
+};
+
+// This is the main function that will be called by Tdarr.
 function plugin (file, librarySettings, Inputs, otherArguments) {
     // Load the lib object
     const lib = require('../methods/lib')();
@@ -652,17 +658,43 @@ function plugin (file, librarySettings, Inputs, otherArguments) {
     }
     response.infoLog += "-> The file is a valid video file.\n";
 
-    // The next part of the code only runs if the file is a video file.
-    // Lets grab the file streams from the file object.
-    let fileStreams = file.ffProbeData.streams;
-
     // Lets create a file that contains all the details about the file. This will be used to create the FFmpeg command.
+    let fileDetails = createFileDetails(file, inputs);
+
+    // Lets check if the file is in the target container.
+    checkTargetContainer(fileDetails);
+
+    // Lets check if the basic file cleanup is enabled.
+    basicFileCleanup(fileDetails);
+
+    // Lets check if the advanced file cleanup is enabled.
+    advancedFileCleanup(fileDetails);
+
+    // Lets add chapter markers if it is enabled.
+    addChapterMarkers(fileDetails, librarySettings);
+
+    return response;
+}
+
+// This function creates an object that contains all the details about the file. This will be used to create the FFmpeg command.
+function createFileDetails(file, inputs) {
+    // Validate inputs
+    if (!file || !inputs) {
+        throw new Error("Missing required parameters: file and inputs.");
+    }
+ 
+    // Grab the file streams from the file object.
+    const fileStreams = file.ffProbeData?.streams || [];
+    const toLowerCaseTrimSplit = str => str.toLowerCase().replace(/\s/g, '').split(',');
+    
+
+    // Create fileDetails object
     let fileDetails = {
         inputFile: file._id,
         fileContainer: file.container,
-        wantedAudioLangs: inputs.audioLangList,
-        wantedSubtitleLangs: inputs.subtitleLangList,
-        wantedAudioChannels: inputs.audioChannelList,
+        wantedAudioLangs: toLowerCaseTrimSplit(inputs.audioLangList),
+        wantedSubtitleLangs: toLowerCaseTrimSplit(inputs.subtitleLangList),
+        wantedAudioChannels: toLowerCaseTrimSplit(inputs.audioChannelList),
         targetFileContainer: inputs.targetFileContainer,
         userInputs: {
             basicFileCleanup: inputs.basicFileCleanup,
@@ -672,10 +704,11 @@ function plugin (file, librarySettings, Inputs, otherArguments) {
         fileStreams: fileStreams.map(stream => ({
             ...stream,
             remove: false,
-            mapArgs: [`-map`, `0:${stream.index}`], //This will be used to map the stream to the output file, we will copy the stream by default.
-            index: stream.index, //This will be used to store the stream index.
-            inputArgs:[], //This will be used to store the input args for the stream.
-            outputArgs: [] //This will be used to store the output args for the stream.
+            extract: false,
+            mapArgs: [`-map`, `0:${stream.index}`],
+            index: stream.index,
+            inputArgs: [],
+            outputArgs: []
         })),
         mediaInfo: file.mediaInfo,
         shouldProcess: false,
@@ -683,17 +716,139 @@ function plugin (file, librarySettings, Inputs, otherArguments) {
         videoTrackCount: fileStreams.filter(stream => stream.codec_type === 'video').length,
         audioTrackCount: fileStreams.filter(stream => stream.codec_type === 'audio').length,
         subtitleTrackCount: fileStreams.filter(stream => stream.codec_type === 'subtitle').length,
+        hasChapters: file.mediaInfo.track.some(track => track['@type'] === 'Menu'),
         fileInputArgs: [],
         fileOutputArgs: []
     };
 
-    // Lets check if the file is in the target container. If it is not, we will convert it to the target container.
-    checkTargetContainer(fileDetails);
+    // Add 'und' to wantedAudioLangs if not present
+    if (!fileDetails.wantedAudioLangs.includes('und')) {
+        fileDetails.wantedAudioLangs.push('und');
+    }
 
-    // Lets check if the basic file cleanup is enabled. If it is, we will remove the unwanted streams from the file.
-    basicFileCleanup(fileDetails);
+    // Add 'und' to wantedSubtitleLangs if not present
+    if (!fileDetails.wantedSubtitleLangs.includes('und')) {
+        fileDetails.wantedSubtitleLangs.push('und');
+    }
 
-    return response;
+    // Create audio details
+    fileDetails = createAudioDetails(fileDetails);
+
+    return fileDetails;
+}
+
+// This function creates an object that contains all the audio details about the file.
+function createAudioDetails(fileDetails) {
+    // Default language for missing tags
+    const defaultAudioLanguage = fileDetails.wantedAudioLangs[0] || 'und';
+
+    // Initialize audio details object with the multi-language flag
+    const audioDetails = {
+        multiLangFlag: false,
+        languages: {}
+    };
+
+    // Populate audio details for each language
+    fileDetails.fileStreams.forEach(stream => {
+        if (stream.codec_type === 'audio') {
+            const lang = stream.tags?.language || defaultAudioLanguage;
+            const channels = stream.channels || 2; // Default to stereo if channel info is missing
+            const codecName = stream.codec_name.toLowerCase();
+            const profile = stream.profile ? stream.profile.toLowerCase() : '';
+
+            if (!audioDetails.languages[lang]) {
+                audioDetails.languages[lang] = {
+                    trackCount: 0,
+                    '1': {
+                        available: false,
+                        trackCount: 0,
+                        codecs: {
+                            aac: { available: false, trackCount: 0 },
+                            other: { available: false, trackCount: 0 }
+                        }
+                    },
+                    '2': {
+                        available: false,
+                        trackCount: 0,
+                        codecs: {
+                            aac: { available: false, trackCount: 0 },
+                            other: { available: false, trackCount: 0 }
+                        }
+                    },
+                    '6': {
+                        available: false,
+                        trackCount: 0,
+                        codecs: {
+                            dtshd: { available: false, trackCount: 0 },
+                            dts: { available: false, trackCount: 0 },
+                            ac3: { available: false, trackCount: 0 },
+                            eac3: { available: false, trackCount: 0 },
+                            aac: { available: false, trackCount: 0 },
+                            other: { available: false, trackCount: 0 }
+                        }
+                    },
+                    '8': {
+                        available: false,
+                        trackCount: 0,
+                        codecs: {
+                            truehd: { available: false, trackCount: 0 },
+                            dtshd: { available: false, trackCount: 0 },
+                            dts: { available: false, trackCount: 0 },
+                            aac: { available: false, trackCount: 0 },
+                            other: { available: false, trackCount: 0 }
+                        }
+                    }
+                };
+            }
+
+            // Update the corresponding language track count
+            audioDetails.languages[lang].trackCount += 1;
+
+            // Update the corresponding channel metadata
+            if ([1, 2, 6, 8].includes(channels)) {
+                audioDetails.languages[lang][channels].available = true; 
+                audioDetails.languages[lang][channels].trackCount += 1;
+
+                // Lets determine the codecType
+                let codecType = 'other';
+                
+                //let handle the channels 1 and 2
+                if ((channels === 1 || channels === 2) && codecName === 'aac') {
+                    codecType = 'aac';
+                }
+
+                // Lets handle the 6 and 8 channels
+                if (channels === 6 || channels === 8) {
+                    // Handle the dts-hd ma codec
+                    if ((codecName === 'dts') && profile === 'dts-hd ma') {
+                        codecName = 'dtshd';
+                    }
+
+                    // lets check the other codecs
+                    if (['truehd', 'aac', 'ac3', 'eac3', 'dtshd', 'dts'].includes(codecName)){
+                        codecType = codecName;
+                    }
+                }
+
+                // Add the codec if not present
+                if (!audioDetails.languages[lang][channels].codecs[codecType]) {
+                    audioDetails.languages[lang][channels].codecs[codecType] = { available: false, trackCount: 0 };
+                }
+
+                // Update the codec metadata
+                audioDetails.languages[lang][channels].codecs[codecType].available = true;
+                audioDetails.languages[lang][channels].codecs[codecType].trackCount += 1;
+            }
+        }
+    });
+
+    // Set multi-language flag if there are multiple languages
+    audioDetails.multiLangFlag = Object.keys(audioDetails.languages).length > 1;
+
+    // Assign audioDetails to fileDetails
+    fileDetails.audioDetails = audioDetails;
+
+    return fileDetails;
 }
 
 // This funtion takes in the fileDetails objects and removes the uncompatible streams from the file based on the Target File Container.
@@ -794,7 +949,124 @@ function basicFileCleanup(fileDetails) {
     }
 }
 
+// This function carries out the advanced file cleanup process.
+function advancedFileCleanup(fileDetails) {
+    // Check if the advanced file cleanup is enabled. If it is not, we will skip the process.
+    if (!fileDetails.userInputs.advancedFileCleanup) {
+        return;
+    }
 
+    fileDetails.message += `-> Starting the advanced file cleanup process.\n`;
+    const TAG_COMMANDS = {audio: '-metadata:s:a:', subtitle: '-metadata:s:s:'};
+    const WANTED_LANGS = {audio: fileDetails.wantedAudioLangs, subtitle: fileDetails.wantedSubtitleLangs};
+    const COMMENTARIES = {
+        eng: ['commentary', 'narration', 'narrator', 'description', 'director', 'voiceover'], 
+        spa: ['comentarios', 'narracion', 'narrador', 'descripcion', 'director', 'voz en off']
+    };
+
+    
+    // Loop through the file and carry out the advanced cleanup process.
+    fileDetails.fileStreams.forEach((stream) => {
+        const codecType = stream?.codec_type?.toLowerCase(); // Get the codec type of the stream.
+       
+        // Skip the stream if the codecType or codecName is not available.
+        if (!codecType) {
+            return; 
+        }
+
+        // Lets process the audio and subtitle streams.
+        if (codecType === 'audio' || codecType === 'subtitle') {
+            let language = (stream.tags && stream.tags.language) ? stream.tags.language.toLowerCase() : 'und'; 
+            let description = (stream.tags && stream.tags.description) ? stream.tags.description.toLowerCase() : '';
+            
+            // Tag tracks that are missing language tags.
+            if (language === 'und') {
+                stream.outputArgs.push(`${TAG_COMMANDS[codecType]}${stream.index} language=${WANTED_LANGS[codecType][0]}`);
+                fileDetails.shouldProcess = true;
+                fileDetails.message += `-> Tagging the ${codecType} stream ${stream.index} with the language ${WANTED_LANGS[codecType][0]}.\n`;
+            }
+
+            // Remove unwanted language streams from the file.
+            if (!stream.remove && ! WANTED_LANGS[codecType].includes(language)) {
+                stream.remove = true;
+                fileDetails.shouldProcess = true;
+                fileDetails.message += `-> Removing the ${language} ${codecType} stream from the file.\n`;
+            }
+
+            // Remove the commentaries from the file.
+            if (!stream.remove && COMMENTARIES[language] && COMMENTARIES[language].some(word => description.includes(word))) {
+                stream.remove = true;
+                fileDetails.shouldProcess = true;
+                fileDetails.message += `-> Removing the ${language} ${codecType} stream from the file.\n`;
+            }
+        }
+    });
+}
+
+// This functions creates a chapter file.
+function createChapterFile(fileDetails, librarySettings) {
+  fileDetails.message += 'Creating the Chapter File.\n';
+  const chapterDuration = 300;
+    let intChapNum = 0;
+    let strChapNum = '';
+    let strChapterFile = '';
+    const strChapterFileLoc = path.join(librarySettings.cache, crypto.createHash('md5').update(fileDetails.inputFile).digest('hex') + '.txt');
+
+    // Loop through the file and create the chapter file.
+    for (let i = 0; i < fileDetails.mediaInfo.format.duration; i += chapterDuration) {
+      intChapNum += 1;
+      strChapNum = String(intChapNum).padStart(2, '0');
+      const timeString = new Date(i * 1000).toISOString().substring(11, 23);
+      strChapterFile += `CHAPTER${strChapNum}=${timeString}\n`;
+      strChapterFile += `CHAPTER${strChapNum}NAME=CHAPTER ${strChapNum}\n`;
+  }
+
+  // Add a chapter 1 sec before the end
+  intChapNum += 1;
+  strChapNum = String(intChapNum).padStart(2, '0');
+  const timeString = new Date((Math.floor(fileDetails.mediaInfo.format.duration) - 1) * 1000).toISOString().substring(11, 23);
+  strChapterFile += `CHAPTER${strChapNum}=${timeString}\n`;
+  strChapterFile += `CHAPTER${strChapNum}NAME=CHAPTER ${strChapNum}\n`;
+
+  // Write the file out to the cache folder
+  fs.writeFileSync(strChapterFileLoc, strChapterFile);
+
+  return strChapterFileLoc;
+}
+
+// This function adds chapter markers to the file if it does not have any.
+function addChapterMarkers(fileDetails, librarySettings) {
+  // Lets check that the user wants to add chapters to the file.
+  if (!fileDetails.userInputs.addChapterMarkers) {
+      return;
+  }
+
+  // Lets check if the file has chapters already
+  if (fileDetails.hasChapters) {
+      return;
+  }
+
+  // Lets create the chapter file.
+  const strChapterFileLoc = createChapterFile(fileDetails, librarySettings);
+
+  // Lets add the chapters to the file.
+  if (fileDetails.fileContainer === 'mkv') {
+    execSync(`mkvpropedit "${fileDetails.inputFile}" --chapters "${strChapterFileLoc}"`);
+
+    // Remove the chapters file
+    fs.unlinkSync(strChapterFileLoc);
+  }
+
+  // Lets add the chapter command to the file details if is an mp4 file.
+  if (fileDetails.fileContainer === 'mp4') {
+    fileDetails.fileOutputArgs.push(`-i ${strChapterFileLoc} -map_metadata 1 -codec copy`);
+    fileDetails.shouldProcess = true;
+  }
+
+  // Add the message to the file details.
+  fileDetails.message += 'Chapters have been added to the file.\n';
+
+}
 
 // Export the plugin details and the plugin function.
 module.exports.details = details;
