@@ -61,6 +61,13 @@ const details = () => ({
             inputUI: { type: 'dropdown', options: ['false', 'true'] },
             tooltip: `This will keep or convert the DTS-HD MA Track.`
         },
+		{
+			name: 'remove_seven_one_tracks',
+			type: 'boolean',
+			defaultValue: false,
+			inputUI: { type: 'dropdown', options: ['false', 'true'] },
+			tooltip: `Remove 7.1+ channel audio tracks per-language, but only if that language will have both 5.1 and Stereo tracks (present or planned).`
+		},
 	]
 });
 
@@ -76,7 +83,6 @@ const plugin = (file, librarySettings, Inputs) => {
         response.infoLog += '- Not a Valid Video File. \n';
         return response;
     }
-	
 
 	//Set up required variables.
     let convertFile = false;
@@ -84,6 +90,7 @@ const plugin = (file, librarySettings, Inputs) => {
 	let downmixTrackCode = '';
 	let convertTrackCode = '';
 	let labelTrackCode = '';
+    const toLowerCaseTrimSplit = str => str.toLowerCase().replace(/\s/g, '').split(',');
 	const fileStreams = file.ffProbeData.streams; //Grab Entire Stream Array
 	const audioStreams = fileStreams.filter(codec => codec.codec_type === 'audio'); //Filter to only the audio streams
 	const AudioDetails = {
@@ -202,6 +209,8 @@ const plugin = (file, librarySettings, Inputs) => {
 		// if(convertFile === true) {response.preset = ffmpegCommand + ` -map 0:s? -c:s copy`; return response;}
 	}
 
+	let plannedStereo = {};  // e.g., plannedStereo['eng'] = true if we will create a 2.0
+	let planned51 = {};      // e.g., planned51['eng'] = true if we will create a 5.1
 	//Downmix Audio Tracks in the file.
 	if(Inputs.downmix_tracks === true){
 		audioID = audioStreams.length;
@@ -218,6 +227,7 @@ const plugin = (file, librarySettings, Inputs) => {
 			if(current_channel >= 7 && AudioDetails['details'][`${current_audio_language}_channels`]['6'] === false){
 				convertFile = true;
 				downmixTrackCode += `-map 0:a:${i} -c:a:${audioID} ac3 -b:a 640k -ac:a:${audioID} 6 -filter:a:${audioID} "volume=1.5" -metadata:s:a:${audioID} "title=5.1 Surround - ac3 - ${current_audio_language}" `;
+				planned51[current_audio_language] = true;
 				response.infoLog += `- No 6 channel track exists. Creating 6 channel from ${current_channel} channel. \n`;
 				response.processFile = true;
 				audioID += 1;
@@ -227,6 +237,7 @@ const plugin = (file, librarySettings, Inputs) => {
 			if (current_channel >= 7 && AudioDetails['details'][`${current_audio_language}_channels`]['2'] === false){
 				convertFile = true;
 				downmixTrackCode += `-map 0:a:${i} -c:a:${audioID} aac -b:a 160k -ac:a:${audioID} 2 -filter:a:${audioID} "volume=1.5" -metadata:s:a:${audioID} "title=Stereo - aac - ${current_audio_language}" `;
+				plannedStereo[current_audio_language] = true;
 				response.infoLog += `- No Stereo track exists. Creating Stereo from ${current_channel} channel. \n`;
 				response.processFile = true;
 				audioID += 1;
@@ -236,6 +247,7 @@ const plugin = (file, librarySettings, Inputs) => {
 			if(current_channel  <= 6 && AudioDetails['details'][`${current_audio_language}_channels`]['8'] === false && AudioDetails['details'][`${current_audio_language}_channels`]['2'] === false){
 				convertFile = true;
 				downmixTrackCode += `-map 0:a:${i} -c:a:${audioID} aac -b:a 160k -ac:a:${audioID} 2 -filter:a:${audioID} "volume=1.5" -metadata:s:a:${audioID} "title=Stereo - aac - ${current_audio_language}" `;
+				plannedStereo[current_audio_language] = true;
 				response.infoLog += '- Audio track is 6 channel, no stereo tracks exists. Creating stereo track from 6 channel. \n';
 				response.processFile = true;
 				audioID += 1;
@@ -271,30 +283,78 @@ const plugin = (file, librarySettings, Inputs) => {
 		}
     }
 
-	//This section converts surround tracks to ac3
-	if(Inputs.convert_surround_tracks === true) {
-		let NonWantedCodec = Inputs.surround_codec_list.split(',');
-		let keepDTSHD = Inputs.keep_dts_hd_ma
-		if (typeof audioStreams !== 'undefined') {
+	// This section converts surround tracks to AC3
+	if (Inputs.convert_surround_tracks === true) {
+		let NonWantedCodec = toLowerCaseTrimSplit(Inputs.surround_codec_list);
+		let keepDTSHD = Inputs.keep_dts_hd_ma;
+
+		response.infoLog += `- NonWantedCodec List: ${NonWantedCodec.join(', ')}\n`;
+
+		if (audioStreams && audioStreams.length > 0) {
 			for (let i = 0; i < audioStreams.length; i++) {
-				//Grab the current audio language
-				current_audio_language = (typeof audioStreams[i].tags.language !== 'undefined') ? audioStreams[i].tags.language.toLowerCase(): 'eng';
-				current_codec = audioStreams[i].codec_name;
-				current_channel = audioStreams[i].channels;
-				current_profile = (keepDTSHD === true ? audioStreams[i].profile : 'audio');
-	
-				if(current_channel === 6 && NonWantedCodec.includes(current_codec) && current_profile !== 'DTS-HD MA'){
+				let current_audio_language = audioStreams[i].tags?.language?.toLowerCase() || 'eng';
+				let current_codec = audioStreams[i].codec_name.toLowerCase();
+				let current_channel = audioStreams[i].channels;
+				let current_profile = keepDTSHD ? audioStreams[i].profile : 'audio';
+
+				response.infoLog += `- Analyzing stream ${i}: ${current_codec}, Channels: ${current_channel}, Profile: ${current_profile}.\n`;
+
+				response.infoLog += `- Checking conditions: Channels=${current_channel}, Codec=${current_codec}, Profile=${current_profile}.\n`;
+				response.infoLog += `- Expected: Channels=6, NonWantedCodec=${NonWantedCodec.join(', ')}, Profile !== 'DTS-HD MA'.\n`;
+
+				if (current_channel !== 6) {
+					response.infoLog += `- Condition not met: current_channel is ${current_channel}, expected 6.\n`;
+				}
+				if (!NonWantedCodec.includes(current_codec)) {
+					response.infoLog += `- Condition not met: current_codec is ${current_codec}, not in list: ${NonWantedCodec.join(', ')}.\n`;
+				}
+				if (current_profile === 'DTS-HD MA') {
+					response.infoLog += `- Condition not met: current_profile is DTS-HD MA.\n`;
+				}
+
+				if (current_channel === 6 && NonWantedCodec.includes(current_codec) && current_profile !== 'DTS-HD MA') {
 					convertFile = true;
-					convertTrackCode += `-c:a:${i} ac3 -b:a 640k -ac:a:${i} 6 -filter:a:${i} "volume=1.5" -metadata:s:a:${i} "title=${current_channel-1}.1 Surround - ac3 - ${current_audio_language}" `;
-					response.infoLog += `- Audio track is ${current_codec}, converting it to AC3. \n`;
+					convertTrackCode += `-c:a:${i} ac3 -b:a 640k -ac:a:${i} 6 -filter:a:${i} "volume=1.5" -metadata:s:a:${i} "title=${current_channel - 1}.1 Surround - ac3 - ${current_audio_language}" `;
+					response.infoLog += `- Audio track is ${current_codec}, converting it to AC3.\n`;
 				}
 			}
+		} else {
+			response.infoLog += `- No audio streams to process.\n`;
 		}
-		if(convertFile === false){
-			response.infoLog += `- Surround Conversion Process Completed. \n`;
+
+		if (!convertFile) {
+			response.infoLog += `- Surround Conversion Process Completed, no conversions necessary.\n`;
 		}
 	}
 
+	// Remove 7.1+ tracks if requested, but only once we know lower tracks exist/will exist
+	let removedTracks = new Set();
+	if (Inputs.remove_seven_one_tracks === true) {
+	response.infoLog += `- 7.1+ removal enabled. Verifying per-language lower-track availability...\n`;
+
+		for (let i = 0; i < audioStreams.length; i++) {
+			const lang = (audioStreams[i].tags?.language?.toLowerCase()) || 'eng';
+			const ch   = audioStreams[i].channels || 0;
+
+			// Only consider 7.1+ (8+ channels)
+			if (ch >= 7) {
+				const hasStereo = (AudioDetails.details[`${lang}_channels`] && AudioDetails.details[`${lang}_channels`]['2']) || !!plannedStereo[lang];
+				const has51     = (AudioDetails.details[`${lang}_channels`] && AudioDetails.details[`${lang}_channels`]['6']) || !!planned51[lang];
+
+				if (hasStereo && has51) {
+					// safe to remove the 7.1+ track
+					convertFile = true;
+					response.processFile = true;
+					// use the same “removal” bucket you used for de-dup (so maps appear before adds)
+					duplicateTrackCode += `-map -0:a:${i} `;
+					response.infoLog += `- Removing 7.1+ track (0:a:${i}, ${ch}ch, ${lang}) since Stereo and 5.1 exist or are planned.\n`;
+					removedTracks.add(i);
+				} else {
+					response.infoLog += `- Keeping 7.1+ track (0:a:${i}, ${ch}ch, ${lang}) because Stereo and/or 5.1 are missing/not planned.\n`;
+				}
+			}
+		}
+	}
 	//Standardize the track names
 	if(Inputs.label_tracks === true){
 		let keepDTSHD = Inputs.keep_dts_hd_ma
@@ -306,6 +366,12 @@ const plugin = (file, librarySettings, Inputs) => {
 			current_channel = audioStreams[i].channels;
 			current_profile = (keepDTSHD === true ? audioStreams[i].profile : 'audio');
 			MAProfile = (current_channel >= 6 && current_codec === 'dts' && current_profile === 'DTS-HD MA') ? '-hd ma':'';
+			
+			// Check if the track will be removed and skip label process.
+			if (removedTracks.has(i)) {
+				response.infoLog += `- Skipping label for removed track 0:a:${i}\n`;
+				continue;
+			}
 
 			if ((current_title === '' || current_title !== `${current_channel-1}.1 Surround - ${current_codec}${MAProfile} - ${current_audio_language}`) && current_channel > 2) {
 				convertFile = true;
@@ -313,6 +379,7 @@ const plugin = (file, librarySettings, Inputs) => {
 				response.infoLog += `- Audio stream detected as ${current_channel} channel with no title, tagging stream 0:a:${i} \n`;
 				response.processFile = true;
 			}
+
 			if ((current_title === '' || current_title !== `${(current_channel ===2) ? 'Stereo': 'Mono'} - ${current_codec} - ${current_audio_language}`) && current_channel <= 2) {
 				convertFile = true;
 				labelTrackCode += `-metadata:s:a:${i} "title=${(current_channel ===2) ? 'Stereo': 'Mono'} - ${current_codec} - ${current_audio_language}" \n`;
@@ -326,8 +393,12 @@ const plugin = (file, librarySettings, Inputs) => {
 		}
 	}
 
+
+	response.infoLog += `- Final convertFile state: ${convertFile}.\n`;
 	if(convertFile === true) {
 		response.preset = `, -map 0:v -c:v copy -map 0:a -c:a copy ${duplicateTrackCode} ${downmixTrackCode} ${convertTrackCode} ${labelTrackCode} -map 0:s? -c:s copy -map 0:t? -c:t copy -max_muxing_queue_size 9999`; 
+		response.infoLog += `- Final preset command: ${response.preset}\n`;
+		response.processFile = true
 		return response;
 	} 
 	
