@@ -5,7 +5,11 @@
  * Description: Builds the normalized file, media, stream, chapter, metadata, and original-language inventory used by the media optimizer workflow.
  * Updates:
  * - 2026-06-29 - Freohrskulblaka: Created analysis helpers for media optimizer classic plugin and future flow components.
+ * - 2026-07-01 - Freohrskulblaka: Added normalized video stream facts for image classification, bitrate, frame rate, resolution, and HDR.
+ * - 2026-07-01 - Freohrskulblaka: Moved video-specific stream enrichment into the video analysis library.
  */
+
+const { analyzeVideoStreams } = require('./video_analysis');
 
 const PICTURE_SUBTITLE_CODECS = ['hdmv_pgs_subtitle', 'dvd_subtitle'];
 
@@ -13,7 +17,7 @@ function analyzeFile(context) {
   const streams = context.file?.ffProbeData?.streams || [];
   const mediaInfoTracks = context.file?.mediaInfo?.track || [];
   const fileInfo = analyzeFileInfo(context.file, context.settings);
-  const streamInfo = analyzeStreams(streams);
+  const streamInfo = analyzeStreams(streams, mediaInfoTracks, context.file);
   const chapterInfo = analyzeChapters(mediaInfoTracks);
   const mediaInfo = analyzeMediaInfo(fileInfo.nameNoExtension, mediaInfoTracks);
   const globalTags = context.file?.ffProbeData?.format?.tags || {};
@@ -34,6 +38,17 @@ function analyzeFile(context) {
 }
 
 function analyzeFileInfo(file, settings) {
+  const hasInvalidStreamDuration = (streams) => {
+    const hasInvalidDuration = streams.some((stream) => {
+      const duration = stream?.duration;
+      const durationIsMissing = !duration;
+      const durationIsNotAvailable = duration === 'N/A';
+
+      return durationIsMissing || durationIsNotAvailable;
+    });
+
+    return hasInvalidDuration;
+  };
   const fileName = file?.meta?.FileName || '';
   const nameNoExtension = file?.fileNameWithoutExtension || fileName.replace(/\.[^/.]+$/, '');
   const container = file?.container || '';
@@ -56,19 +71,7 @@ function analyzeFileInfo(file, settings) {
   return fileInfo;
 }
 
-function hasInvalidStreamDuration(streams) {
-  const hasInvalidDuration = streams.some((stream) => {
-    const duration = stream?.duration;
-    const durationIsMissing = !duration;
-    const durationIsNotAvailable = duration === 'N/A';
-
-    return durationIsMissing || durationIsNotAvailable;
-  });
-
-  return hasInvalidDuration;
-}
-
-function analyzeStreams(streams) {
+function analyzeStreams(streams, mediaInfoTracks, file) {
   const videoStreams = streams.filter((stream) => stream.codec_type === 'video');
   const audioStreams = streams.filter((stream) => stream.codec_type === 'audio');
   const subtitleStreams = streams.filter((stream) => stream.codec_type === 'subtitle');
@@ -76,27 +79,13 @@ function analyzeStreams(streams) {
 
   const streamInfo = {
     all: streams,
-    video: analyzeVideoStreams(videoStreams),
+    video: analyzeVideoStreams(videoStreams, mediaInfoTracks, file),
     audio: analyzeAudioStreams(audioStreams),
     subtitle: analyzeSubtitleStreams(subtitleStreams),
     attachment: analyzeAttachmentStreams(attachmentStreams),
   };
 
   return streamInfo;
-}
-
-function analyzeVideoStreams(videoStreams) {
-  const videoInfo = {
-    items: videoStreams,
-    count: videoStreams.length,
-    hasStreams: videoStreams.length > 0,
-    hasMultipleStreams: videoStreams.length > 1,
-    hasTitles: videoStreams.some((stream) => Boolean(stream?.tags?.title)),
-    indices: videoStreams.map((stream) => stream.index ?? -1),
-    codecs: getUniqueValues(videoStreams, (stream) => stream?.codec_name || 'unknown'),
-  };
-
-  return videoInfo;
 }
 
 function analyzeAudioStreams(audioStreams) {
@@ -268,4 +257,3 @@ module.exports = {
   analyzeFile,
   summarizeAnalysis,
 };
-
