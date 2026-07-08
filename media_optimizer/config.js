@@ -12,20 +12,24 @@ const { createLog } = require('./logging');
 const PROFILE_STATUS = {enabled: 'enabled', disabled: 'disabled', invalid: 'invalid'};
 
 const VIDEO_PROFILES = {
-  'Balanced 1080p': { status: PROFILE_STATUS.enabled, mode: 'balanced', encoderPreset: 'slow', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.101', upscaleTo1080p: true, preserve4k: true, hdrPolicy: 'preserve' },
-  'Archive Quality': { status: PROFILE_STATUS.enabled, mode: 'archive', encoderPreset: 'slow', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.12', upscaleTo1080p: false, preserve4k: true, hdrPolicy: 'preserve' },
-  'Smaller Files': { status: PROFILE_STATUS.enabled, mode: 'small', encoderPreset: 'medium', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.08', upscaleTo1080p: false, preserve4k: true, hdrPolicy: 'preserve' },
-  'Compress 4K Preserve HDR Experimental (Disabled)': { status: PROFILE_STATUS.disabled, disabledReason: '4K HDR-preserving transcode planning has not been implemented yet.', mode: 'compress4k', encoderPreset: 'slow', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.101', upscaleTo1080p: false, preserve4k: false, hdrPolicy: 'preserve' },
+  'Balanced 1080p': { status: PROFILE_STATUS.enabled, mode: 'balanced', encoderPreset: 'slow', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.101', upscaleTo1080p: true, preserve4k: true, hdrPolicy: 'preserveSignaling' },
+  'Archive Quality': { status: PROFILE_STATUS.enabled, mode: 'archive', encoderPreset: 'slow', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.12', upscaleTo1080p: false, preserve4k: true, hdrPolicy: 'preserveSignaling' },
+  'Smaller Files': { status: PROFILE_STATUS.enabled, mode: 'small', encoderPreset: 'medium', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.08', upscaleTo1080p: false, preserve4k: true, hdrPolicy: 'preserveSignaling' },
+  'Compress 4K Preserve HDR Signaling': { status: PROFILE_STATUS.enabled, mode: 'compress4k', encoderPreset: 'slow', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.101', upscaleTo1080p: false, preserve4k: true, hdrPolicy: 'preserveSignaling' },
   'Compress 4K to SDR Experimental (Disabled)': { status: PROFILE_STATUS.disabled, disabledReason: 'HDR to SDR tonemapping has not been implemented yet.', mode: 'compress4kToSdr', encoderPreset: 'slow', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.09', upscaleTo1080p: false, preserve4k: false, hdrPolicy: 'toneMapToSdr' },
   'Skip HDR Transcode (Disabled)': { status: PROFILE_STATUS.disabled, disabledReason: 'HDR detection and skip behavior has not been implemented yet.', mode: 'skipIfHdr', encoderPreset: 'copy', encodingProfile: 'copy', bitDepth: 'source', targetCompressionRate: '0.101', upscaleTo1080p: false, preserve4k: true, hdrPolicy: 'skipIfHdr' },
-  'Copy When Compatible': { status: PROFILE_STATUS.enabled, mode: 'copyCompatible', encoderPreset: 'slow', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.101', upscaleTo1080p: false, preserve4k: true, hdrPolicy: 'preserve' },
+  'Copy When Compatible': { status: PROFILE_STATUS.enabled, mode: 'copyCompatible', encoderPreset: 'slow', encodingProfile: 'main10', bitDepth: '10-Bit', targetCompressionRate: '0.101', upscaleTo1080p: false, preserve4k: true, hdrPolicy: 'preserveSignaling' },
 };
 
 const VIDEO_CODEC_PROFILES = {
   'H.265 / HEVC - NVIDIA GPU': { status: PROFILE_STATUS.enabled, targetCodec: 'hevc', encoder: 'hevc_nvenc', encoderFamily: 'nvidia' },
   'H.265 / HEVC - CPU (Disabled)': { status: PROFILE_STATUS.disabled, disabledReason: 'CPU HEVC encoding support has not been implemented yet.', targetCodec: 'hevc', encoder: 'libx265', encoderFamily: 'cpu' },
+  'H.265 / HEVC - Intel GPU (Disabled)': { status: PROFILE_STATUS.disabled, disabledReason: 'Intel QSV HEVC encoding support has not been implemented yet.', targetCodec: 'hevc', encoder: 'hevc_qsv', encoderFamily: 'intel' },
+  'H.265 / HEVC - AMD GPU (Disabled)': { status: PROFILE_STATUS.disabled, disabledReason: 'AMD AMF HEVC encoding support has not been implemented yet.', targetCodec: 'hevc', encoder: 'hevc_amf', encoderFamily: 'amd' },
   'H.264 - NVIDIA GPU (Disabled)': { status: PROFILE_STATUS.disabled, disabledReason: 'H.264 NVIDIA encoding support has not been implemented yet.', targetCodec: 'h264', encoder: 'h264_nvenc', encoderFamily: 'nvidia' },
   'H.264 - CPU (Disabled)': { status: PROFILE_STATUS.disabled, disabledReason: 'CPU H.264 encoding support has not been implemented yet.', targetCodec: 'h264', encoder: 'libx264', encoderFamily: 'cpu' },
+  'H.264 - Intel GPU (Disabled)': { status: PROFILE_STATUS.disabled, disabledReason: 'Intel QSV H.264 encoding support has not been implemented yet.', targetCodec: 'h264', encoder: 'h264_qsv', encoderFamily: 'intel' },
+  'H.264 - AMD GPU (Disabled)': { status: PROFILE_STATUS.disabled, disabledReason: 'AMD AMF H.264 encoding support has not been implemented yet.', targetCodec: 'h264', encoder: 'h264_amf', encoderFamily: 'amd' },
   'Copy Video': { status: PROFILE_STATUS.enabled, targetCodec: 'copy', encoder: 'copy', encoderFamily: 'copy' },
 };
 
