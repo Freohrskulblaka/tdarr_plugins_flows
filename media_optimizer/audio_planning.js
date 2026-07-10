@@ -219,7 +219,7 @@ function createRemovalReasons(track, outputTracks, languageOrder, context) {
   const reasons = [];
 
   if (track.isCommentary && context.settings.audio.removeCommentary) {
-    reasons.push('Audio track appears to be commentary, descriptive, narration, or director commentary.');
+    reasons.push(createCommentaryRemovalReason(track));
   }
 
   if (!languageOrder.includes(track.language)) {
@@ -309,6 +309,16 @@ function collectAudioReasons(outputTracks, removedTracks) {
   });
 
   return reasons;
+}
+
+function createCommentaryRemovalReason(track) {
+  const commentaryReasons = track.commentaryReasons || [];
+
+  if (commentaryReasons.length === 0) {
+    return 'Audio track appears to be commentary, descriptive, narration, or director commentary.';
+  }
+
+  return `Audio track appears to be commentary, descriptive, narration, or director commentary (${commentaryReasons.join(', ')}).`;
 }
 
 function shouldProcessAudio(candidateTracks, outputTracks, removedTracks, generatedTracks) {

@@ -19,7 +19,7 @@ function analyzeAudioStreams(audioStreams, mediaInfoTracks) {
   const mediaInfoAudioTracks = mediaInfoTracks.filter((track) => track['@type'] === 'Audio');
   const enrichedAudioStreams = audioStreams.map((stream, streamIndex) => {
     const mediaInfoAudioTrack = findAudioMediaInfoTrack(mediaInfoAudioTracks, streamIndex);
-    return enrichAudioStream(stream, streamIndex, mediaInfoAudioTrack);
+    return enrichAudioStream(stream, mediaInfoAudioTrack);
   });
   const languages = getUniqueValues(enrichedAudioStreams, (stream) => stream.analysis.audio.language);
   const audioInfo = {
@@ -29,9 +29,7 @@ function analyzeAudioStreams(audioStreams, mediaInfoTracks) {
     hasMultipleStreams: enrichedAudioStreams.length > 1,
     hasMultipleLanguages: languages.length > 1,
     hasUntaggedStreams: languages.includes('und'),
-    hasCommentaryStreams: enrichedAudioStreams.some((stream) => stream.analysis.audio.isCommentary),
     languages,
-    languageVariants: getUniqueValues(enrichedAudioStreams, (stream) => stream.analysis.audio.languageLabel),
     channels: getUniqueValues(enrichedAudioStreams, (stream) => stream.analysis.audio.channels || 'unknown'),
     channelFamilies: getUniqueValues(enrichedAudioStreams, (stream) => stream.analysis.audio.channelFamily),
     codecs: getUniqueValues(enrichedAudioStreams, (stream) => stream.analysis.audio.codec),
@@ -40,7 +38,7 @@ function analyzeAudioStreams(audioStreams, mediaInfoTracks) {
   return audioInfo;
 }
 
-function enrichAudioStream(stream, streamIndex, mediaInfoAudioTrack) {
+function enrichAudioStream(stream, mediaInfoAudioTrack) {
   const title = stream.tags?.title || '';
   const language = normalizeAudioLanguage(stream.tags?.language || 'und');
   const languageVariant = detectAudioLanguageVariant(stream, mediaInfoAudioTrack, language);
@@ -52,8 +50,6 @@ function enrichAudioStream(stream, streamIndex, mediaInfoAudioTrack) {
   const bitrate = parseAudioBitrate(stream.bit_rate || stream.tags?.BPS || mediaInfoAudioTrack?.BitRate);
   const commentary = analyzeAudioCommentary(stream);
   const audioAnalysis = {
-    mediaInfo: mediaInfoAudioTrack,
-    streamOrder: streamIndex,
     title,
     language,
     languageVariant,
