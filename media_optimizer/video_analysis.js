@@ -19,26 +19,21 @@ function analyzeVideoStreams(videoStreams, mediaInfoTracks, file) {
   const mediaInfoVideoTracks = mediaInfoTracks.filter((track) => track['@type'] === 'Video');
   const enrichedVideoStreams = videoStreams.map((stream, streamIndex) => {
     const mediaInfoVideoTrack = mediaInfoVideoTracks[streamIndex] || {};
-    return enrichVideoStream(stream, streamIndex, mediaInfoVideoTrack, file);
+    return enrichVideoStream(stream, mediaInfoVideoTrack, file);
   });
   const videoInfo = {
     items: enrichedVideoStreams,
     count: enrichedVideoStreams.length,
-    playableCount: enrichedVideoStreams.filter((stream) => !stream.analysis.isImageStream).length,
-    imageCount: enrichedVideoStreams.filter((stream) => stream.analysis.isImageStream).length,
     hasStreams: enrichedVideoStreams.length > 0,
     hasPlayableStreams: enrichedVideoStreams.some((stream) => !stream.analysis.isImageStream),
-    hasImageStreams: enrichedVideoStreams.some((stream) => stream.analysis.isImageStream),
     hasMultipleStreams: enrichedVideoStreams.length > 1,
-    hasTitles: enrichedVideoStreams.some((stream) => Boolean(stream?.tags?.title)),
-    indices: enrichedVideoStreams.map((stream) => stream.index ?? -1),
     codecs: getUniqueValues(enrichedVideoStreams, (stream) => stream?.codec_name || 'unknown'),
   };
 
   return videoInfo;
 }
 
-function enrichVideoStream(stream, streamIndex, mediaInfoVideoTrack, file) {
+function enrichVideoStream(stream, mediaInfoVideoTrack, file) {
   const resolveIsImageStream = () => {
     const codecName = String(stream.codec_name || '').toLowerCase();
     const codecLongName = String(stream.codec_long_name || '').toLowerCase();
@@ -57,8 +52,6 @@ function enrichVideoStream(stream, streamIndex, mediaInfoVideoTrack, file) {
   const frameRate = getVideoFrameRate(stream, mediaInfoVideoTrack, file);
   const enrichedStream = Object.assign({}, stream, {
     analysis: {
-      mediaInfo: mediaInfoVideoTrack,
-      streamOrder: streamIndex,
       isImageStream: resolveIsImageStream(),
       width,
       height,
