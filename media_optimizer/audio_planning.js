@@ -6,16 +6,15 @@
  * Updates:
  * - 2026-06-30 - Freohrskulblaka: Created first-pass audio planning helper for language and channel profile decisions.
  * - 2026-07-07 - Freohrskulblaka: Refined audio planning around language order, commentary removal, 7.1 fallback generation, title normalization, and deterministic defaults.
+ * - 2026-07-10 - Freohrskulblaka: Moved source audio classification into the audio analysis library.
  */
+
+const {
+  normalizeLanguageForVariant: normalizeAudioLanguage,
+} = require('./media_text_analysis');
 
 const CHANNEL_RANK = {'7.1': 0, '5.1': 1, stereo: 2, other: 3};
 const CODEC_QUALITY_RANK = {truehd: 0, dts: 1, eac3: 2, ac3: 3, flac: 4, opus: 5, aac: 6, mp3: 7};
-const COMMENTARY_TITLE_PATTERNS = [
-  /commentary|commentator|director.?s? comment|audio comment/,
-  /descriptive|description|described video|narration|narrator/,
-  /comentarios?|comentarios? del director|comentarios? de director|audio comentario|audiocomentario/,
-  /audio descriptivo|audiodescripcion|descripcion de audio|narracion|narrador/,
-];
 
 function planAudio(context) {
   const audioStreams = context.analysis.streams.audio.items;
@@ -34,8 +33,8 @@ function planAudio(context) {
 }
 
 function createFinalAudioLanguageOrder(context) {
-  const originalLanguage = normalizeLanguage(context.analysis.originalLanguage?.language || 'und');
-  const configuredLanguages = context.settings.languageOrder.audio.map(normalizeLanguage);
+  const originalLanguage = normalizeAudioLanguage(context.analysis.originalLanguage?.language || 'und');
+  const configuredLanguages = context.settings.languageOrder.audio.map(normalizeAudioLanguage);
   const desiredLanguages = new Set([originalLanguage, ...configuredLanguages]);
   const languageOrder = Array.from(desiredLanguages);
 
@@ -43,18 +42,17 @@ function createFinalAudioLanguageOrder(context) {
 }
 
 function createAudioTrack(stream, sourceOrder, context) {
-  const mediaInfoTrack = getAudioMediaInfoTrack(context, sourceOrder);
-  const title = stream.tags?.title || '';
-  const language = normalizeLanguage(stream.tags?.language || 'und');
-  const languageVariant = detectAudioLanguageVariant(stream, mediaInfoTrack, language);
-  const channels = Number(stream.channels || 0);
-  const channelFamily = getChannelFamily(channels);
-  const codec = normalizeCodec(stream.codec_name || 'unknown');
+  const audioAnalysis = stream.analysis.audio;
+  const title = audioAnalysis.title;
+  const language = audioAnalysis.language;
+  const languageVariant = audioAnalysis.languageVariant;
+  const languageLabel = audioAnalysis.languageLabel;
+  const channels = audioAnalysis.channels;
+  const channelFamily = audioAnalysis.channelFamily;
+  const codec = audioAnalysis.codec;
   const targetCodec = resolveTargetAudioCodec(codec, channelFamily, context);
   const action = targetCodec !== codec ? 'convert' : 'copy';
-  const desiredTitle = createAudioTitle({channelFamily, targetCodec, profile: stream.profile || '', language, languageVariant});
-  const currentDefault = Boolean(stream.disposition?.default);
-  const isCommentary = isCommentaryAudioStream(stream);
+  const desiredTitle = createAudioTitle({channelFamily, targetCodec, profile: audioAnalysis.profile, languageLabel});
 
   return {
     sourceIndex: stream.index,
@@ -62,21 +60,23 @@ function createAudioTrack(stream, sourceOrder, context) {
     outputIndex: null,
     codec,
     targetCodec,
-    profile: stream.profile || '',
+    profile: audioAnalysis.profile,
     language,
     languageVariant,
+    languageLabel,
     channels,
     channelFamily,
     title,
     desiredTitle,
     titleNeedsUpdate: title !== desiredTitle,
-    isCommentary,
+    isCommentary: audioAnalysis.isCommentary,
+    commentaryReasons: audioAnalysis.commentaryReasons,
     action,
     default: false,
-    currentDefault,
+    currentDefault: audioAnalysis.currentDefault,
     generated: false,
     sourceTrackIndex: stream.index,
-    bitrate: parseBitrate(stream.bit_rate || stream.tags?.BPS),
+    bitrate: audioAnalysis.bitrate,
     reasons: [],
   };
 }
@@ -170,7 +170,8 @@ function createGeneratedAudioTracks(selectedTracks, eligibleSources, context, la
 function createGeneratedAudioTrack(sourceTrack, language, channels, channelFamily) {
   const targetCodec = channelFamily === 'stereo' ? 'aac' : 'ac3';
   const languageVariant = sourceTrack.languageVariant || '';
-  const title = createAudioTitle({channelFamily, targetCodec, profile: sourceTrack.profile, language, languageVariant});
+  const languageLabel = sourceTrack.languageLabel;
+  const title = createAudioTitle({channelFamily, targetCodec, profile: sourceTrack.profile, languageLabel});
 
   return {
     sourceIndex: sourceTrack.sourceIndex,
@@ -181,6 +182,7 @@ function createGeneratedAudioTrack(sourceTrack, language, channels, channelFamil
     profile: sourceTrack.profile,
     language,
     languageVariant,
+    languageLabel,
     channels,
     channelFamily,
     title,
@@ -236,7 +238,7 @@ function createRemovalReasons(track, outputTracks, languageOrder, context) {
   }
 
   if (reasons.length === 0 && !isPreserveAudioProfile(context)) {
-    reasons.push(`A better ${track.channelFamily} ${createAudioLanguageLabel(track.language, track.languageVariant)} audio track was selected.`);
+    reasons.push(`A better ${track.channelFamily} ${track.languageLabel} audio track was selected.`);
   }
 
   return reasons;
@@ -363,22 +365,6 @@ function hasChannelFamily(tracks, language, channelFamily, languageVariant) {
   });
 }
 
-function getChannelFamily(channels) {
-  if (channels >= 8) {
-    return '7.1';
-  }
-
-  if (channels >= 6) {
-    return '5.1';
-  }
-
-  if (channels <= 2) {
-    return 'stereo';
-  }
-
-  return 'other';
-}
-
 function resolveTargetAudioCodec(codec, channelFamily, context) {
   if (isPreserveAudioProfile(context)) {
     return codec;
@@ -401,27 +387,10 @@ function isPreserveAudioProfile(context) {
     && !context.settings.audio.createMissingStereo;
 }
 
-function isCommentaryAudioStream(stream) {
-  const disposition = stream.disposition || {};
-  const hasCommentaryDisposition = Boolean(disposition.comment || disposition.descriptions);
-  const title = stream.tags?.title || stream.tags?.TITLE || '';
-  const hasCommentaryTitle = isCommentaryTrack(title);
-
-  return hasCommentaryDisposition || hasCommentaryTitle;
-}
-
-function isCommentaryTrack(title) {
-  const normalizedTitle = normalizeVariantText(title);
-  const isCommentary = COMMENTARY_TITLE_PATTERNS.some((pattern) => pattern.test(normalizedTitle));
-
-  return isCommentary;
-}
-
 function createAudioTitle(track) {
   const channelLabel = createAudioChannelLabel(track.channelFamily);
   const codecLabel = createAudioCodecLabel(track.targetCodec, track.profile);
-  const languageLabel = createAudioLanguageLabel(track.language, track.languageVariant);
-  const finalTitle = `${channelLabel} - ${codecLabel} - ${languageLabel}`;
+  const finalTitle = `${channelLabel} - ${codecLabel} - ${track.languageLabel}`;
 
   return finalTitle;
 }
@@ -433,7 +402,7 @@ function createAudioChannelLabel(channelFamily) {
 }
 
 function createAudioCodecLabel(codec, profile) {
-  const normalizedCodec = normalizeCodec(codec);
+  const normalizedCodec = String(codec || 'unknown').trim().toLowerCase();
   const normalizedProfile = String(profile || '').trim().toLowerCase();
 
   if (normalizedCodec === 'dts' && normalizedProfile === 'dts-hd ma') {
@@ -445,16 +414,6 @@ function createAudioCodecLabel(codec, profile) {
   }
 
   return normalizedCodec;
-}
-
-function createAudioLanguageLabel(language, languageVariant) {
-  const normalizedLanguage = normalizeLanguage(language);
-
-  if (languageVariant) {
-    return `${normalizedLanguage}-${languageVariant}`;
-  }
-
-  return normalizedLanguage;
 }
 
 function createLanguageVariantGroups(tracks) {
@@ -469,92 +428,6 @@ function createLanguageVariantGroups(tracks) {
   });
 
   return languageVariants;
-}
-
-function getAudioMediaInfoTrack(context, sourceOrder) {
-  const mediaInfoTracks = context.analysis.media.tracks || [];
-  const audioTracks = mediaInfoTracks.filter((track) => track['@type'] === 'Audio');
-  const streamOrder = String(sourceOrder + 1);
-  const mediaInfoTrack = audioTracks.find((track) => String(track.StreamOrder) === streamOrder) || audioTracks[sourceOrder] || null;
-
-  return mediaInfoTrack;
-}
-
-function detectAudioLanguageVariant(stream, mediaInfoTrack, language) {
-  if (language !== 'spa') {
-    return '';
-  }
-
-  const languageFields = [
-    stream.tags?.language,
-    stream.tags?.LANGUAGE,
-    mediaInfoTrack?.Language,
-  ];
-  const titleFields = [
-    stream.tags?.title,
-    stream.tags?.TITLE,
-    mediaInfoTrack?.Title,
-  ];
-  const languageVariant = detectSpanishVariantFromLanguageCodes(languageFields)
-    || detectSpanishVariantFromText(titleFields);
-
-  return languageVariant;
-}
-
-function detectSpanishVariantFromLanguageCodes(languageCodes) {
-  const normalizedCodes = languageCodes.map(normalizeVariantText);
-
-  if (normalizedCodes.some((languageCode) => /(^|[-_])(es|spa)[-_]?(419|latam|latinoamerica)(\b|$)/.test(languageCode))) {
-    return 'LatAm';
-  }
-
-  if (normalizedCodes.some((languageCode) => /(^|[-_])(es|spa)[-_]?(mx|mex)(\b|$)/.test(languageCode))) {
-    return 'MX';
-  }
-
-  if (normalizedCodes.some((languageCode) => /(^|[-_])(es|spa)[-_]?es(\b|$)/.test(languageCode))) {
-    return 'ES';
-  }
-
-  return '';
-}
-
-function detectSpanishVariantFromText(values) {
-  const normalizedText = normalizeVariantText(values.join(' '));
-
-  if (/spa[-_ ]?latam|es[-_ ]?419|latinoamerica|latin america|latam|latino/.test(normalizedText)) {
-    return 'LatAm';
-  }
-
-  if (/spa[-_ ]?mx|es[-_ ]?mx|mexico|mexican/.test(normalizedText)) {
-    return 'MX';
-  }
-
-  if (/spa[-_ ]?es|es[-_ ]?es|espana|spain|castilian|castellano/.test(normalizedText)) {
-    return 'ES';
-  }
-
-  return '';
-}
-
-function normalizeVariantText(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-}
-
-function normalizeCodec(codec) {
-  return String(codec || 'unknown').trim().toLowerCase();
-}
-
-function normalizeLanguage(language) {
-  return String(language || 'und').trim().toLowerCase() || 'und';
-}
-
-function parseBitrate(value) {
-  const parsedValue = Number(value);
-  return Number.isFinite(parsedValue) ? parsedValue : 0;
 }
 
 function getCodecQualityRank(codec) {
