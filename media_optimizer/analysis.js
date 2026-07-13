@@ -10,8 +10,8 @@
  */
 
 const { analyzeVideoStreams } = require('./video_analysis');
-
-const PICTURE_SUBTITLE_CODECS = ['hdmv_pgs_subtitle', 'dvd_subtitle'];
+const { analyzeAudioStreams } = require('./audio_analysis');
+const { analyzeExternalSubtitleFiles, analyzeSubtitleStreams } = require('./subtitle_analysis');
 
 function analyzeFile(context) {
   const streams = context.file?.ffProbeData?.streams || [];
@@ -20,8 +20,9 @@ function analyzeFile(context) {
   const streamInfo = analyzeStreams(streams, mediaInfoTracks, context.file);
   const chapterInfo = analyzeChapters(mediaInfoTracks);
   const mediaInfo = analyzeMediaInfo(fileInfo.nameNoExtension, mediaInfoTracks);
+  const externalSubtitles = analyzeExternalSubtitleFiles(fileInfo);
   const globalTags = context.file?.ffProbeData?.format?.tags || {};
-  const summary = createAnalysisSummary(fileInfo, streamInfo, chapterInfo, globalTags);
+  const summary = createAnalysisSummary(fileInfo, streamInfo, chapterInfo, globalTags, externalSubtitles);
 
   const analysis = {
     file: fileInfo,
@@ -29,6 +30,7 @@ function analyzeFile(context) {
     streams: streamInfo,
     summary,
     chapters: chapterInfo.chapters,
+    externalSubtitles,
     globalTags,
     originalLanguage: null,
     videoSettings: context.settings.video,
@@ -80,48 +82,12 @@ function analyzeStreams(streams, mediaInfoTracks, file) {
   const streamInfo = {
     all: streams,
     video: analyzeVideoStreams(videoStreams, mediaInfoTracks, file),
-    audio: analyzeAudioStreams(audioStreams),
-    subtitle: analyzeSubtitleStreams(subtitleStreams),
+    audio: analyzeAudioStreams(audioStreams, mediaInfoTracks),
+    subtitle: analyzeSubtitleStreams(subtitleStreams, mediaInfoTracks),
     attachment: analyzeAttachmentStreams(attachmentStreams),
   };
 
   return streamInfo;
-}
-
-function analyzeAudioStreams(audioStreams) {
-  const languages = getUniqueValues(audioStreams, (stream) => stream?.tags?.language || 'und');
-
-  const audioInfo = {
-    items: audioStreams,
-    count: audioStreams.length,
-    hasStreams: audioStreams.length > 0,
-    hasMultipleStreams: audioStreams.length > 1,
-    hasMultipleLanguages: languages.length > 1,
-    hasUntaggedStreams: languages.includes('und'),
-    languages,
-    channels: getUniqueValues(audioStreams, (stream) => stream?.channels || 'unknown'),
-    codecs: getUniqueValues(audioStreams, (stream) => stream?.codec_name || 'unknown'),
-  };
-
-  return audioInfo;
-}
-
-function analyzeSubtitleStreams(subtitleStreams) {
-  const languages = getUniqueValues(subtitleStreams, (stream) => stream?.tags?.language || 'und');
-  const codecs = getUniqueValues(subtitleStreams, (stream) => stream?.codec_name || 'unknown');
-
-  const subtitleInfo = {
-    items: subtitleStreams,
-    count: subtitleStreams.length,
-    hasStreams: subtitleStreams.length > 0,
-    hasMultipleStreams: subtitleStreams.length > 1,
-    hasMultipleLanguages: languages.length > 1,
-    hasPictureSubtitles: subtitleStreams.some((stream) => PICTURE_SUBTITLE_CODECS.includes(stream?.codec_name)),
-    languages,
-    codecs,
-  };
-
-  return subtitleInfo;
 }
 
 function analyzeAttachmentStreams(attachmentStreams) {
@@ -186,7 +152,7 @@ function analyzeMediaInfo(fileNameNoExtension, mediaInfoTracks) {
   return mediaInfo;
 }
 
-function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, globalTags) {
+function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, globalTags, externalSubtitles) {
   const summary = {
     isVideoFile: fileInfo.medium === 'video',
     isNotVideoFile: fileInfo.medium !== 'video',
@@ -207,6 +173,7 @@ function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, globalTags) {
     videoStreamCount: streamInfo.video.count,
     audioStreamCount: streamInfo.audio.count,
     subtitleStreamCount: streamInfo.subtitle.count,
+    externalSubtitleCount: externalSubtitles.length,
     attachmentCount: streamInfo.attachment.count,
     chapterCount: chapterInfo.count,
     audioLanguages: streamInfo.audio.languages,
