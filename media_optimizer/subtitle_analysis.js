@@ -7,10 +7,12 @@
  * - 2026-07-10 - Freohrskulblaka: Extracted subtitle source classification from the subtitle planner.
  * - 2026-07-13 - Freohrskulblaka: Added subtitle richness facts and external SRT source inventory.
  * - 2026-07-13 - Freohrskulblaka: Limited external SRT discovery to sidecars matching the current media filename.
+ * - 2026-07-13 - Freohrskulblaka: Reused shared analysis utility helpers.
  */
 
 const fs = require('fs');
 const path = require('path');
+const { getUniqueValues } = require('./analysis_utils');
 const {
   analyzeCommentaryTrack,
   createLanguageLabel: createSubtitleLanguageLabel,
@@ -342,13 +344,6 @@ function getExternalFileSize(filePath) {
   } catch (error) {
     return null;
   }
-}
-
-function getUniqueValues(items, getValue) {
-  const values = items.map(getValue);
-  const uniqueValues = [...new Set(values)];
-
-  return uniqueValues;
 }
 
 module.exports = {

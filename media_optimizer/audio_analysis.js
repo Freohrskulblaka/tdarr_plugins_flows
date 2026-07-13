@@ -6,8 +6,10 @@
  * Updates:
  * - 2026-07-10 - Freohrskulblaka: Extracted audio stream classification from the audio planner.
  * - 2026-07-10 - Freohrskulblaka: Reused shared commentary and generalized language variant detection.
+ * - 2026-07-13 - Freohrskulblaka: Reused shared analysis utility helpers.
  */
 
+const { getUniqueValues } = require('./analysis_utils');
 const {
   analyzeCommentaryTrack,
   createLanguageLabel: createAudioLanguageLabel,
@@ -130,13 +132,6 @@ function normalizeAudioCodec(codec) {
 function parseAudioBitrate(value) {
   const parsedValue = Number(value);
   return Number.isFinite(parsedValue) ? parsedValue : 0;
-}
-
-function getUniqueValues(items, getValue) {
-  const values = items.map(getValue);
-  const uniqueValues = [...new Set(values)];
-
-  return uniqueValues;
 }
 
 module.exports = {

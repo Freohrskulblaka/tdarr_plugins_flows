@@ -5,17 +5,14 @@
  * Description: Builds normalized video stream facts for image classification, bitrate, frame rate, resolution, and HDR.
  * Updates:
  * - 2026-07-01 - Freohrskulblaka: Extracted video analysis from the main analysis orchestrator.
+ * - 2026-07-13 - Freohrskulblaka: Reused shared analysis utility helpers.
  */
+
+const { getUniqueValues } = require('./analysis_utils');
 
 const IMAGE_VIDEO_CODECS = ['mjpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/bmp', 'image/webp', 'image/tiff', 'image/x-ms-bmp'];
 
 function analyzeVideoStreams(videoStreams, mediaInfoTracks, file) {
-  const getUniqueValues = (items, getValue) => {
-    const values = items.map(getValue);
-    const uniqueValues = [...new Set(values)];
-
-    return uniqueValues;
-  };
   const mediaInfoVideoTracks = mediaInfoTracks.filter((track) => track['@type'] === 'Video');
   const enrichedVideoStreams = videoStreams.map((stream, streamIndex) => {
     const mediaInfoVideoTrack = mediaInfoVideoTracks[streamIndex] || {};
