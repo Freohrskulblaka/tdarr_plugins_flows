@@ -7,10 +7,15 @@
  * - 2026-06-29 - Freohrskulblaka: Created analysis helpers for media optimizer classic plugin and future flow components.
  * - 2026-07-01 - Freohrskulblaka: Added normalized video stream facts for image classification, bitrate, frame rate, resolution, and HDR.
  * - 2026-07-01 - Freohrskulblaka: Moved video-specific stream enrichment into the video analysis library.
+ * - 2026-07-13 - Freohrskulblaka: Extracted file, attachment, chapter, and media identity source facts into focused analysis modules.
  */
 
+const { analyzeAttachmentStreams } = require('./attachment_analysis');
 const { analyzeVideoStreams } = require('./video_analysis');
 const { analyzeAudioStreams } = require('./audio_analysis');
+const { analyzeChapters } = require('./chapter_analysis');
+const { analyzeFileInfo } = require('./file_analysis');
+const { analyzeMediaInfo } = require('./media_info_analysis');
 const { analyzeExternalSubtitleFiles, analyzeSubtitleStreams } = require('./subtitle_analysis');
 
 function analyzeFile(context) {
@@ -39,40 +44,6 @@ function analyzeFile(context) {
   return analysis;
 }
 
-function analyzeFileInfo(file, settings) {
-  const hasInvalidStreamDuration = (streams) => {
-    const hasInvalidDuration = streams.some((stream) => {
-      const duration = stream?.duration;
-      const durationIsMissing = !duration;
-      const durationIsNotAvailable = duration === 'N/A';
-
-      return durationIsMissing || durationIsNotAvailable;
-    });
-
-    return hasInvalidDuration;
-  };
-  const fileName = file?.meta?.FileName || '';
-  const nameNoExtension = file?.fileNameWithoutExtension || fileName.replace(/\.[^/.]+$/, '');
-  const container = file?.container || '';
-  const targetContainer = settings.output.container;
-  const fileExtension = file?.meta?.FileTypeExtension || container;
-
-  const fileInfo = {
-    id: file?._id || '',
-    directory: file?.meta?.Directory || '',
-    container,
-    medium: file?.fileMedium || '',
-    nameNoExtension,
-    extension: fileExtension ? `.${fileExtension}` : '',
-    type: file?.meta?.FileType || '',
-    targetContainer,
-    needsRemux: Boolean(container && container !== targetContainer),
-    useGenpts: hasInvalidStreamDuration(file?.ffProbeData?.streams || []),
-  };
-
-  return fileInfo;
-}
-
 function analyzeStreams(streams, mediaInfoTracks, file) {
   const videoStreams = streams.filter((stream) => stream.codec_type === 'video');
   const audioStreams = streams.filter((stream) => stream.codec_type === 'audio');
@@ -88,68 +59,6 @@ function analyzeStreams(streams, mediaInfoTracks, file) {
   };
 
   return streamInfo;
-}
-
-function analyzeAttachmentStreams(attachmentStreams) {
-  const attachmentInfo = {
-    items: attachmentStreams,
-    count: attachmentStreams.length,
-    hasAttachments: attachmentStreams.length > 0,
-    mimeTypes: getUniqueValues(attachmentStreams, (stream) => stream?.tags?.mimetype || stream?.codec_name || 'unknown'),
-  };
-
-  return attachmentInfo;
-}
-
-function analyzeChapters(mediaInfoTracks) {
-  const chapters = mediaInfoTracks.filter((track) => track['@type'] === 'Menu');
-
-  const chapterInfo = {
-    chapters,
-    count: chapters.length,
-    hasChapters: chapters.length > 0,
-  };
-
-  return chapterInfo;
-}
-
-// Filename parsing follows the Radarr/Sonarr naming formats used by this workflow.
-// Radarr movies include title, release year, optional edition tags, IMDb ID, quality,
-// media info, audio languages, and subtitle language hints. Sonarr episodes include
-// series title/year, TVDB ID, season/episode, optional anime absolute episode,
-// episode title, quality/media info, audio languages, and subtitle language hints.
-function analyzeMediaInfo(fileNameNoExtension, mediaInfoTracks) {
-  const nameYearMatch = fileNameNoExtension.match(/(.+?) \((\d{4})\)/);
-  const tvdbIdMatch = fileNameNoExtension.match(/\[tvdbid-(\d+)]/i) || fileNameNoExtension.match(/tvdbid-(\d+)/i);
-  const imdbIdMatch = fileNameNoExtension.match(/\[imdb-(tt\d+)]/i) || fileNameNoExtension.match(/imdb-(tt\d+)/i);
-  const seasonEpisodeMatch = fileNameNoExtension.match(/s(\d{2})e(\d{1,3})/i);
-  const absoluteEpisodeMatch = fileNameNoExtension.match(/s\d{2}e\d{1,3} - (\d{3})/i);
-  const resolutionMatch = fileNameNoExtension.match(/(2160p|4k|1080p|720p|480p)/i);
-  const hasTvdbEpisode = Boolean(tvdbIdMatch && seasonEpisodeMatch);
-  const hasImdbId = Boolean(imdbIdMatch);
-
-  let mediaType = 'Unknown';
-
-  if (hasTvdbEpisode) {
-    mediaType = 'TV Show';
-  } else if (hasImdbId) {
-    mediaType = 'Movie';
-  }
-
-  const mediaInfo = {
-    type: mediaType,
-    name: nameYearMatch?.[1] || '',
-    year: nameYearMatch?.[2] || '',
-    season: seasonEpisodeMatch?.[1] || '',
-    episode: seasonEpisodeMatch?.[2] || '',
-    absoluteEpisode: absoluteEpisodeMatch?.[1] || '',
-    resolution: resolutionMatch?.[1] || '',
-    imdbId: imdbIdMatch?.[1] || null,
-    tvdbId: tvdbIdMatch?.[1] || null,
-    tracks: mediaInfoTracks,
-  };
-
-  return mediaInfo;
 }
 
 function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, globalTags, externalSubtitles) {
@@ -185,13 +94,6 @@ function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, globalTags, ex
   };
 
   return summary;
-}
-
-function getUniqueValues(items, getValue) {
-  const values = items.map(getValue);
-  const uniqueValues = [...new Set(values)];
-
-  return uniqueValues;
 }
 
 function summarizeAnalysis(analysis) {
