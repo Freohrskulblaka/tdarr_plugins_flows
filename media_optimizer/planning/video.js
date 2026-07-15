@@ -15,6 +15,8 @@
  *   - Nested bitrate options and selected bitrate profile.
  *   - Refactored video decisions to return planned track objects.
  *   - Mirrored current 4K, HDR signaling, NVENC rate-control, and pixel-format planning.
+ * - 2026-07-15 - Freohrskulblaka:
+ *   - Tightened target-compression-rate parity for preserved 4K and invalid frame-rate handling.
  */
 
 function planVideo(context) {
@@ -211,6 +213,10 @@ function applyVideoCompatibilityDecision(track, context) {
     reasons.push(`Video bitrate ${bitrate.current.kbps}k from ${bitrate.current.source} is above target maximum ${bitrate.selected.maxKbps}k.`);
   }
 
+  if (!bitrate.selected.isCalculable) {
+    reasons.push('Video target bitrate could not be calculated because width, height, frame rate, or target compression rate is missing.');
+  }
+
   if (bitrate.current.isEstimated) {
     reasons.push('Video bitrate is a file-level estimate; bitrate-only transcode decisions are skipped.');
   }
@@ -244,7 +250,7 @@ function selectVideoBitrateProfile({ bitrate, shouldUpscale, shouldDownscale4k, 
   if (shouldUpscale || shouldDownscale4k) {
     selectedProfile = bitrate.fullHd;
   } else if (shouldPreserve4k) {
-    selectedProfile = bitrate.full4k;
+    selectedProfile = bitrate.native;
   }
 
   return selectedProfile;
@@ -421,6 +427,7 @@ function createBitratePlan({ width, height, frameRate, bitRate, bitrateSource, f
       targetKbps,
       minKbps: roundToNearestHundred(targetKbps * 0.75),
       maxKbps: roundToNearestHundred(targetKbps * 1.25),
+      isCalculable: targetKbps > 0,
     };
 
     return targetProfile;
@@ -430,7 +437,6 @@ function createBitratePlan({ width, height, frameRate, bitRate, bitrateSource, f
   const currentKbps = Math.floor(bitRate / 1000);
   const native = createTargetProfile('native', calculateOptimalBitrate(width, height, frameRate, adjustedCompressionRate));
   const fullHd = createTargetProfile('fullHd', calculateOptimalBitrate(1920, 1080, frameRate, adjustedCompressionRate));
-  const full4k = createTargetProfile('full4k', calculateOptimalBitrate(3840, 2160, frameRate, adjustedCompressionRate));
   const bitrate = {
     current: {
       kbps: currentKbps,
@@ -440,7 +446,6 @@ function createBitratePlan({ width, height, frameRate, bitRate, bitrateSource, f
     },
     native,
     fullHd,
-    full4k,
     selected: native,
   };
 
