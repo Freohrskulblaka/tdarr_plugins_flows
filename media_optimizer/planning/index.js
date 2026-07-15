@@ -9,6 +9,7 @@
  * - 2026-07-01 - Freohrskulblaka: Added required media stream safeguards for video and audio.
  * - 2026-07-13 - Freohrskulblaka: Extracted attachment and chapter planning into focused planning modules.
  * - 2026-07-15 - Freohrskulblaka: Extracted metadata planning into a focused planning module.
+ * - 2026-07-15 - Freohrskulblaka: Added a command placeholder for the FFmpeg renderer output.
  */
 
 const { planAttachments } = require('./attachment');
@@ -59,6 +60,7 @@ function buildProcessingPlan(context) {
     attachments,
     chapters,
     metadata,
+    command: null,
     ffmpegArgs: [],
   };
 
