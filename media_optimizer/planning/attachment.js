@@ -5,52 +5,89 @@
  * Description: Builds attachment copy/removal decisions from normalized attachment analysis facts.
  * Updates:
  * - 2026-07-13 - Freohrskulblaka: Extracted attachment planning from the planning coordinator.
+ * - 2026-07-15 - Freohrskulblaka: Planned attachments from normalized attachment facts and added attachment counts.
  */
 
 function planAttachments(context) {
-  const attachmentStreams = context.analysis.streams.attachment.items;
-  const tracks = attachmentStreams.map((stream) => {
-    const fileName = stream.tags?.filename || '';
-    const mimeType = stream.tags?.mimetype || stream.codec_name || '';
-    const isFont = isFontAttachment(fileName, mimeType);
-    const shouldKeep = context.settings.metadata.keepFontAttachments && isFont;
-    const action = shouldKeep || !context.settings.metadata.removeNonFontAttachments ? 'copy' : 'remove';
-    const reasons = [];
-
-    if (action === 'remove') {
-      reasons.push('Attachment is not a font attachment and remove-non-font-attachments is enabled.');
-    }
-
-    return {
-      sourceIndex: stream.index,
-      fileName,
-      mimeType,
-      isFont,
-      action,
-      reasons,
-    };
-  });
+  const attachmentItems = context.analysis.streams.attachment.items;
+  const tracks = attachmentItems.map((attachment) => planAttachmentTrack(attachment, context.settings.metadata));
   
   const removedTracks = tracks.filter((track) => track.action === 'remove');
-  const reasons = [];
-
-  tracks.forEach((track) => {
-    reasons.push(...track.reasons);
-  });
+  const copiedTracks = tracks.filter((track) => track.action === 'copy');
+  const reasons = collectAttachmentReasons(tracks);
 
   return {
     tracks,
     removedTracks,
+    copiedTracks,
+    keptCount: copiedTracks.length,
+    removedCount: removedTracks.length,
+    fontCount: tracks.filter((track) => track.isFont).length,
+    nonFontCount: tracks.filter((track) => !track.isFont).length,
     shouldProcess: removedTracks.length > 0,
     reasons,
   };
 }
 
-function isFontAttachment(fileName, mimeType) {
-  const value = `${fileName} ${mimeType}`.toLowerCase();
-  const isFont = /font|\.ttf|\.otf|\.woff|\.woff2/.test(value);
+function planAttachmentTrack(attachment, metadataSettings) {
+  const action = getAttachmentAction(attachment, metadataSettings);
+  const reasons = getAttachmentPlanReasons(attachment, action, metadataSettings);
 
-  return isFont;
+  return {
+    sourceIndex: attachment.sourceIndex,
+    fileName: attachment.fileName,
+    mimeType: attachment.mimeType,
+    codecName: attachment.codecName,
+    extension: attachment.extension,
+    attachmentType: attachment.attachmentType,
+    isFont: attachment.isFont,
+    isImage: attachment.isImage,
+    isLikelySubtitleFont: attachment.isLikelySubtitleFont,
+    action,
+    reasons,
+  };
+}
+
+function getAttachmentAction(attachment, metadataSettings) {
+  if (!metadataSettings.removeNonFontAttachments) {
+    return 'copy';
+  }
+
+  if (metadataSettings.keepFontAttachments && attachment.isFont) {
+    return 'copy';
+  }
+
+  return 'remove';
+}
+
+function getAttachmentPlanReasons(attachment, action, metadataSettings) {
+  if (action === 'copy' && attachment.isFont) {
+    return ['Font attachment is preserved for styled subtitles.'];
+  }
+
+  if (action === 'copy' && !metadataSettings.removeNonFontAttachments) {
+    return ['Attachment is preserved by the selected metadata profile.'];
+  }
+
+  if (action === 'remove' && !attachment.isFont) {
+    return ['Non-font attachment is removed by the selected metadata profile.'];
+  }
+
+  return ['Attachment is removed by the selected metadata profile.'];
+}
+
+function collectAttachmentReasons(tracks) {
+  const reasons = [];
+
+  tracks.forEach((track) => {
+    track.reasons.forEach((reason) => {
+      if (reason && !reasons.includes(reason)) {
+        reasons.push(reason);
+      }
+    });
+  });
+
+  return reasons;
 }
 
 module.exports = {
