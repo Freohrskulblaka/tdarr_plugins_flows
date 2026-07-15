@@ -6,6 +6,7 @@
  * Updates:
  * - 2026-07-13 - Freohrskulblaka: Extracted chapter planning from the planning coordinator and modeled generated chapter markers.
  * - 2026-07-13 - Freohrskulblaka: Added media-type-aware generated chapter count bounds.
+ * - 2026-07-15 - Freohrskulblaka: Skipped generated chapter planning when duration is unavailable.
  */
 
 const DEFAULT_CHAPTER_INTERVAL_SECONDS = 300;
@@ -16,6 +17,7 @@ const MAX_MOVIE_CHAPTER_COUNT = 30;
 function planChapters(context) {
   const existingChapters = context.analysis.chapters || [];
   const hasChapters = existingChapters.length > 0;
+  const durationSeconds = getDurationSeconds(context);
 
   if (hasChapters) {
     return {
@@ -23,14 +25,29 @@ function planChapters(context) {
       count: existingChapters.length,
       existingCount: existingChapters.length,
       generatedCount: 0,
+      durationSeconds,
       intervalSeconds: null,
       shouldProcess: false,
       reasons: [],
     };
   }
 
-  const durationSeconds = getDurationSeconds(context);
   const mediaType = context.analysis.media?.type || 'Unknown';
+
+  if (durationSeconds <= 0) {
+    return {
+      action: 'skip',
+      count: 0,
+      existingCount: 0,
+      generatedCount: 0,
+      durationSeconds,
+      intervalSeconds: null,
+      mediaType,
+      shouldProcess: false,
+      reasons: ['No chapters were detected, but duration is unavailable; generated chapter markers will be skipped.'],
+    };
+  }
+
   const generatedCount = estimateGeneratedChapterCount(durationSeconds, DEFAULT_CHAPTER_INTERVAL_SECONDS, mediaType);
   const reasons = ['No chapters were detected; generated chapter markers will be added.'];
 
@@ -39,6 +56,7 @@ function planChapters(context) {
     count: generatedCount,
     existingCount: 0,
     generatedCount,
+    durationSeconds,
     intervalSeconds: DEFAULT_CHAPTER_INTERVAL_SECONDS,
     mediaType,
     shouldProcess: true,
