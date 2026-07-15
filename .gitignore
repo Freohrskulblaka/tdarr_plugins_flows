@@ -1,0 +1,85 @@
+# Local runtime configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+*.local.*
+config.local.*
+settings.local.*
+secrets.*
+*.secret
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Tdarr/local deployment exports
+methods/
+tdarr/
+Tdarr/
+server/
+node/
+configs/
+config/
+library-settings/
+library_settings/
+flow_exports/
+flow-exports/
+plugin_exports/
+plugin-exports/
+*.flow.json
+*.flow-local.json
+*.tdarr.json
+*.tdarr-local.json
+
+# Logs, reports, and scratch output
+logs/
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+scratch/
+work/
+cache/
+.cache/
+coverage/
+
+# Media and generated test fixtures
+samples/
+sample_media/
+fixtures/media/
+*.mkv
+*.mp4
+*.avi
+*.mov
+*.m4v
+*.ts
+*.m2ts
+*.srt
+*.ass
+*.ssa
+*.sub
+
+# Local planning/context copied from the wrapper project
+context/
+notes/
+sessions/
+runtime_settings*
+current_runtime_settings*
+private/
+local/
+
+# Dependency/build output
+node_modules/
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
