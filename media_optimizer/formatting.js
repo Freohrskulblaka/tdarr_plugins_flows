@@ -7,6 +7,7 @@
  * - 2026-06-29 - Freohrskulblaka: Created final track table formatting helper.
  * - 2026-06-30 - Freohrskulblaka: Updated formatting for sectioned processing plans.
  * - 2026-07-06 - Freohrskulblaka: Updated video bitrate formatting for nested bitrate profiles.
+ * - 2026-07-15 - Freohrskulblaka: Added metadata cleanup detail rendering.
  */
 
 function renderFinalTrackTable(plan) {
@@ -23,8 +24,8 @@ function renderFinalTrackTable(plan) {
   lines.push('');
   renderAttachments(lines, plan.attachments);
   lines.push('');
-  lines.push(`Chapters: ${plan.chapters.action} (${plan.chapters.count})`);
-  lines.push(`Strip global tags: ${plan.metadata.stripGlobalTags ? 'yes' : 'no'}`);
+  renderChapters(lines, plan.chapters);
+  renderMetadata(lines, plan.metadata);
 
   if (plan.reasons.length > 0) {
     lines.push('');
@@ -87,8 +88,46 @@ function renderAttachments(lines, attachmentPlan) {
     return;
   }
 
+  lines.push(`  kept=${attachmentPlan.keptCount} removed=${attachmentPlan.removedCount} fonts=${attachmentPlan.fontCount} nonFonts=${attachmentPlan.nonFontCount}`);
+
   attachmentPlan.tracks.forEach((track) => {
     lines.push(`  src=${track.sourceIndex} action=${track.action} font=${track.isFont ? 'yes' : 'no'} name="${track.fileName}" mime="${track.mimeType}"`);
+  });
+}
+
+function renderChapters(lines, chapterPlan) {
+  const details = [];
+
+  if (chapterPlan.durationSeconds > 0) {
+    details.push(`duration=${Math.floor(chapterPlan.durationSeconds)}s`);
+  }
+
+  if (chapterPlan.intervalSeconds) {
+    details.push(`interval=${chapterPlan.intervalSeconds}s`);
+  }
+
+  if (chapterPlan.mediaType) {
+    details.push(`mediaType="${chapterPlan.mediaType}"`);
+  }
+
+  const detailText = details.length > 0 ? ` ${details.join(' ')}` : '';
+  lines.push(`Chapters: ${chapterPlan.action} (${chapterPlan.count})${detailText}`);
+}
+
+function renderMetadata(lines, metadataPlan) {
+  lines.push('Metadata:');
+  lines.push(`  stripGlobalTags=${metadataPlan.stripGlobalTags ? 'yes' : 'no'} globalTagKeys=${metadataPlan.globalTagKeys.length}`);
+  lines.push(`  removeFileTitle=${metadataPlan.removeFileTitle ? 'yes' : 'no'} fileTitle=${metadataPlan.fileTitle ? 'yes' : 'no'}`);
+  lines.push(`  removeVideoTitles=${metadataPlan.removeVideoTitles ? 'yes' : 'no'} titledVideoStreams=${metadataPlan.videoTitleTracks.length}`);
+  lines.push(`  removeExtraTagStreams=${metadataPlan.removeExtraTagStreams ? 'yes' : 'no'} extraTagStreams=${metadataPlan.extraTagTracks.length}`);
+  lines.push(`  writeCustomGlobalMetadata=${metadataPlan.writeCustomGlobalMetadata ? 'yes' : 'no'}`);
+
+  metadataPlan.videoTitleTracks.forEach((track) => {
+    lines.push(`  video src=${track.sourceIndex} action=${track.action} title="${track.title}"`);
+  });
+
+  metadataPlan.extraTagTracks.forEach((track) => {
+    lines.push(`  ${track.codecType || 'unknown'} src=${track.sourceIndex} action=${track.action} codec=${track.codecName || 'unknown'} title="${track.title}"`);
   });
 }
 
