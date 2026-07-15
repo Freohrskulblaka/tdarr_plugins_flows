@@ -48,8 +48,8 @@ const SUBTITLE_PROFILES = {
 };
 
 const METADATA_PROFILES = {
-  Clean: { stripGlobalTags: true, keepFontAttachments: true, removeNonFontAttachments: true },
-  Preserve: { stripGlobalTags: false, keepFontAttachments: true, removeNonFontAttachments: false },
+  Clean: {stripGlobalTags: true, removeExtraTagStreams: true, removeFileTitle: true, removeVideoTitles: true, keepFontAttachments: true, removeNonFontAttachments: true, writeCustomGlobalMetadata: false},
+  Preserve: {stripGlobalTags: false, removeExtraTagStreams: false, removeFileTitle: false, removeVideoTitles: false, keepFontAttachments: true, removeNonFontAttachments: false, writeCustomGlobalMetadata: false},
 };
 
 function loadInputs(inputs, details) {
