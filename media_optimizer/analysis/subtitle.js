@@ -5,9 +5,10 @@
  * Description: Builds normalized subtitle stream facts for language, type, defaults, forced flags, and commentary detection.
  * Updates:
  * - 2026-07-10 - Freohrskulblaka: Extracted subtitle source classification from the subtitle planner.
- * - 2026-07-13 - Freohrskulblaka: Added subtitle richness facts and external SRT source inventory.
- * - 2026-07-13 - Freohrskulblaka: Limited external SRT discovery to sidecars matching the current media filename.
- * - 2026-07-13 - Freohrskulblaka: Reused shared analysis utility helpers.
+ * - 2026-07-13 - Freohrskulblaka:
+ *   - Added subtitle richness facts and external SRT source inventory.
+ *   - Limited external SRT discovery to sidecars matching the current media filename.
+ *   - Reused shared analysis utility helpers.
  */
 
 const fs = require('fs');

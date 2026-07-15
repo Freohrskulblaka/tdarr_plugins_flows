@@ -8,12 +8,14 @@
  * - 2026-06-30 - Freohrskulblaka: Replaced no-op planning with coordinated video, audio, subtitle, attachment, chapter, and metadata decisions.
  * - 2026-07-01 - Freohrskulblaka: Added required media stream safeguards for video and audio.
  * - 2026-07-13 - Freohrskulblaka: Extracted attachment and chapter planning into focused planning modules.
+ * - 2026-07-15 - Freohrskulblaka: Extracted metadata planning into a focused planning module.
  */
 
 const { planAttachments } = require('./attachment');
 const { planVideo } = require('./video');
 const { planAudio } = require('./audio');
 const { planChapters } = require('./chapter');
+const { planMetadata } = require('./metadata');
 const { planSubtitles } = require('./subtitle');
 
 function buildProcessingPlan(context) {
@@ -108,23 +110,6 @@ function planContainer(context) {
   };
 
   return containerPlan;
-}
-
-function planMetadata(context) {
-  const globalTagKeys = Object.keys(context.analysis.globalTags || {});
-  const shouldStripGlobalTags = context.settings.metadata.stripGlobalTags && globalTagKeys.length > 0;
-  const reasons = [];
-
-  if (shouldStripGlobalTags) {
-    reasons.push('Global tags will be stripped by the selected metadata profile.');
-  }
-
-  return {
-    stripGlobalTags: context.settings.metadata.stripGlobalTags,
-    globalTagKeys,
-    shouldProcess: shouldStripGlobalTags,
-    reasons,
-  };
 }
 
 function collectPlanReasons(sections) {

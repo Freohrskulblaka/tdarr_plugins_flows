@@ -8,6 +8,7 @@
  * - 2026-07-01 - Freohrskulblaka: Added normalized video stream facts for image classification, bitrate, frame rate, resolution, and HDR.
  * - 2026-07-01 - Freohrskulblaka: Moved video-specific stream enrichment into the video analysis library.
  * - 2026-07-13 - Freohrskulblaka: Extracted file, attachment, chapter, and media identity source facts into focused analysis modules.
+ * - 2026-07-15 - Freohrskulblaka: Moved metadata source facts into a focused analysis module.
  */
 
 const { analyzeAttachmentStreams } = require('./attachment');
@@ -16,6 +17,7 @@ const { analyzeAudioStreams } = require('./audio');
 const { analyzeChapters } = require('./chapter');
 const { analyzeFileInfo } = require('./file');
 const { analyzeMediaInfo } = require('./media_info');
+const { analyzeMetadata } = require('./metadata');
 const { analyzeExternalSubtitleFiles, analyzeSubtitleStreams } = require('./subtitle');
 
 function analyzeFile(context) {
@@ -26,8 +28,8 @@ function analyzeFile(context) {
   const chapterInfo = analyzeChapters(mediaInfoTracks);
   const mediaInfo = analyzeMediaInfo(fileInfo.nameNoExtension, mediaInfoTracks);
   const externalSubtitles = analyzeExternalSubtitleFiles(fileInfo);
-  const globalTags = context.file?.ffProbeData?.format?.tags || {};
-  const summary = createAnalysisSummary(fileInfo, streamInfo, chapterInfo, globalTags, externalSubtitles);
+  const metadataInfo = analyzeMetadata(streams, context.file?.ffProbeData?.format?.tags || {});
+  const summary = createAnalysisSummary(fileInfo, streamInfo, chapterInfo, metadataInfo, externalSubtitles);
 
   const analysis = {
     file: fileInfo,
@@ -36,7 +38,8 @@ function analyzeFile(context) {
     summary,
     chapters: chapterInfo.chapters,
     externalSubtitles,
-    globalTags,
+    metadata: metadataInfo,
+    globalTags: metadataInfo.globalTags,
     originalLanguage: null,
     videoSettings: context.settings.video,
   };
@@ -61,7 +64,7 @@ function analyzeStreams(streams, mediaInfoTracks, file) {
   return streamInfo;
 }
 
-function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, globalTags, externalSubtitles) {
+function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, metadataInfo, externalSubtitles) {
   const summary = {
     isVideoFile: fileInfo.medium === 'video',
     isNotVideoFile: fileInfo.medium !== 'video',
@@ -85,12 +88,16 @@ function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, globalTags, ex
     externalSubtitleCount: externalSubtitles.length,
     attachmentCount: streamInfo.attachment.count,
     chapterCount: chapterInfo.count,
+    extraTagStreamCount: metadataInfo.extraTagStreamCount,
+    videoTitleCount: metadataInfo.videoTitleCount,
     audioLanguages: streamInfo.audio.languages,
     audioChannels: streamInfo.audio.channels,
     audioCodecs: streamInfo.audio.codecs,
     subtitleLanguages: streamInfo.subtitle.languages,
     subtitleCodecs: streamInfo.subtitle.codecs,
-    globalTagKeys: Object.keys(globalTags),
+    globalTagKeys: metadataInfo.globalTagKeys,
+    hasFileTitle: metadataInfo.hasFileTitle,
+    hasExtraTagStreams: metadataInfo.hasExtraTagStreams,
   };
 
   return summary;

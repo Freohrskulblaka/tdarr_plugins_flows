@@ -6,12 +6,14 @@
  * Updates:
  * - 2026-06-30 - Freohrskulblaka: Created first-pass subtitle planning helper for language and type profile decisions.
  * - 2026-07-09 - Freohrskulblaka: Added v1 default/forced cleanup, external SRT import planning, and broader commentary detection.
- * - 2026-07-10 - Freohrskulblaka: Reused shared commentary text detection helpers.
- * - 2026-07-10 - Freohrskulblaka: Moved embedded subtitle source facts into subtitle analysis.
+ * - 2026-07-10 - Freohrskulblaka:
+ *   - Reused shared commentary text detection helpers.
+ *   - Moved embedded subtitle source facts into subtitle analysis.
  * - 2026-07-11 - Freohrskulblaka: Set the first planned subtitle track as the only default subtitle.
- * - 2026-07-13 - Freohrskulblaka: Consumed external subtitle source inventory from analysis.
- * - 2026-07-13 - Freohrskulblaka: Ordered fuller subtitle tracks ahead of sparse variants within each language and type.
- * - 2026-07-13 - Freohrskulblaka: Added conservative subtitle title standardization while preserving anime subtitle titles.
+ * - 2026-07-13 - Freohrskulblaka:
+ *   - Consumed external subtitle source inventory from analysis.
+ *   - Ordered fuller subtitle tracks ahead of sparse variants within each language and type.
+ *   - Added conservative subtitle title standardization while preserving anime subtitle titles.
  */
 
 const {
