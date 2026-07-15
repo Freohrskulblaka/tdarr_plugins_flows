@@ -8,7 +8,7 @@
  * - 2026-07-13 - Freohrskulblaka: Reused shared analysis utility helpers.
  */
 
-const { getUniqueValues } = require('./analysis_utils');
+const { getUniqueValues } = require('./utils');
 
 function analyzeAttachmentStreams(attachmentStreams) {
   const attachmentInfo = {

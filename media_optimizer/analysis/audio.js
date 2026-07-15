@@ -9,13 +9,13 @@
  * - 2026-07-13 - Freohrskulblaka: Reused shared analysis utility helpers.
  */
 
-const { getUniqueValues } = require('./analysis_utils');
+const { getUniqueValues } = require('./utils');
 const {
   analyzeCommentaryTrack,
   createLanguageLabel: createAudioLanguageLabel,
   detectLanguageVariant,
   normalizeLanguageForVariant: normalizeAudioLanguage,
-} = require('./media_text_analysis');
+} = require('../shared/media_text');
 
 function analyzeAudioStreams(audioStreams, mediaInfoTracks) {
   const mediaInfoAudioTracks = mediaInfoTracks.filter((track) => track['@type'] === 'Audio');

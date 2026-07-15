@@ -12,13 +12,13 @@
 
 const fs = require('fs');
 const path = require('path');
-const { getUniqueValues } = require('./analysis_utils');
+const { getUniqueValues } = require('./utils');
 const {
   analyzeCommentaryTrack,
   createLanguageLabel: createSubtitleLanguageLabel,
   detectLanguageVariant,
   normalizeLanguageForVariant: normalizeSubtitleLanguage,
-} = require('./media_text_analysis');
+} = require('../shared/media_text');
 
 const PICTURE_SUBTITLE_CODECS = ['hdmv_pgs_subtitle', 'dvd_subtitle'];
 const TEXT_SUBTITLE_CODECS = ['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'mov_text'];
