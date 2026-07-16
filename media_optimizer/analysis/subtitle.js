@@ -9,6 +9,7 @@
  *   - Added subtitle richness facts and external SRT source inventory.
  *   - Limited external SRT discovery to sidecars matching the current media filename.
  *   - Reused shared analysis utility helpers.
+ * - 2026-07-15 - Freohrskulblaka: Counted external SRT cue rows for duplicate-import checks.
  */
 
 const fs = require('fs');
@@ -118,6 +119,7 @@ function createExternalSubtitleFile(filePath, mediaNameNoExtension, sourceOrder)
   const language = detectExternalSubtitleLanguage(fileName, mediaNameNoExtension);
   const languageVariant = detectLanguageVariant(language, [language], [title]);
   const streamSize = getExternalFileSize(filePath);
+  const cueCount = countExternalSrtCues(filePath);
   const isEmpty = streamSize === 0;
   const externalSubtitle = {
     sourceKind: 'external',
@@ -131,8 +133,8 @@ function createExternalSubtitleFile(filePath, mediaNameNoExtension, sourceOrder)
     language,
     languageVariant,
     languageLabel: createSubtitleLanguageLabel(language, languageVariant),
-    frameCount: null,
-    elementCount: null,
+    frameCount: cueCount,
+    elementCount: cueCount,
     streamSize,
     bitRate: null,
     isEmpty,
@@ -342,6 +344,17 @@ function parseSubtitleMetric(value) {
 function getExternalFileSize(filePath) {
   try {
     return fs.statSync(filePath).size;
+  } catch (error) {
+    return null;
+  }
+}
+
+function countExternalSrtCues(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const cueMatches = content.match(/\d{2}:\d{2}:\d{2},\d{3}\s+-->\s+\d{2}:\d{2}:\d{2},\d{3}/g);
+
+    return cueMatches ? cueMatches.length : null;
   } catch (error) {
     return null;
   }
