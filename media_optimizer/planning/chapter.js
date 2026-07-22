@@ -8,6 +8,7 @@
  *   - Extracted chapter planning from the planning coordinator and modeled generated chapter markers.
  *   - Added media-type-aware generated chapter count bounds.
  * - 2026-07-15 - Freohrskulblaka: Skipped generated chapter planning when duration is unavailable.
+ * - 2026-07-21 - Freohrskulblaka: Included the final end-of-file chapter marker in generated chapter counts.
  */
 
 const DEFAULT_CHAPTER_INTERVAL_SECONDS = 300;
@@ -82,7 +83,7 @@ function estimateGeneratedChapterCount(durationSeconds, intervalSeconds, mediaTy
     return 0;
   }
 
-  const intervalCount = Math.ceil(durationSeconds / intervalSeconds);
+  const intervalCount = Math.ceil(durationSeconds / intervalSeconds) + 1;
   const boundedMinimumCount = Math.max(MIN_GENERATED_CHAPTER_COUNT, intervalCount);
   const maximumCount = getMaximumGeneratedChapterCount(mediaType);
 
