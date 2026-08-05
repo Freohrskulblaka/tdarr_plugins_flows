@@ -3,6 +3,9 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-21
  * Description: Renders embedded subtitle copies and external SRT imports into FFmpeg arguments.
+ * Updates:
+ * - 2026-08-04 - Freohrskulblaka: Leave kept embedded subtitles as stream copies; only annotate newly imported external subtitles.
+ * - 2026-08-04 - Freohrskulblaka: Apply planned subtitle dispositions during active remuxes while preserving embedded subtitle metadata.
  */
 
 const { addDisposition, addStreamMetadata, quoteArg } = require('./args');
@@ -30,24 +33,31 @@ function addExternalSubtitleInputs(subtitlePlan, inputArgs, startingInputIndex) 
 }
 
 function addSubtitleArgs(args, subtitlePlan, streamIndexes, externalSubtitleInputs) {
+  const shouldApplyDispositions = subtitlePlan?.shouldProcess === true;
+
   (subtitlePlan?.tracks || []).forEach((track) => {
+    const outputIndex = streamIndexes.subtitle;
+
     if (track.sourceKind === 'external') {
       const inputIndex = externalSubtitleInputs.get(track.sourcePath);
       args.push('-map', `${inputIndex}:0`);
-      args.push(`-c:s:${streamIndexes.subtitle}`, 'copy');
+      args.push(`-c:s:${outputIndex}`, 'copy');
+      addStreamMetadata(args, 's', outputIndex, {
+        language: track.language,
+        title: track.title,
+      });
     } else {
       args.push('-map', `0:${track.sourceIndex}`);
-      args.push(`-c:s:${streamIndexes.subtitle}`, 'copy');
+      args.push(`-c:s:${outputIndex}`, 'copy');
     }
 
-    addStreamMetadata(args, 's', streamIndexes.subtitle, {
-      language: track.language,
-      title: track.title,
-    });
-    addDisposition(args, 's', streamIndexes.subtitle, {
-      default: track.default,
-      forced: false,
-    });
+    if (shouldApplyDispositions) {
+      addDisposition(args, 's', outputIndex, {
+        default: track.default,
+        forced: false,
+      });
+    }
+
     streamIndexes.subtitle += 1;
   });
 }

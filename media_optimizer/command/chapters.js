@@ -3,6 +3,10 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-21
  * Description: Renders kept chapters and generated chapter metadata inputs into FFmpeg arguments.
+ * Updates:
+ * - 2026-08-05 - Freohrskulblaka: Avoid guessing a previous Tdarr work directory for generated chapter metadata.
+ * - 2026-08-04 - Freohrskulblaka: Wrote user-visible generated chapter titles.
+ * - 2026-08-04 - Freohrskulblaka: Prefer Tdarr's active job work directory for generated chapter metadata files.
  */
 
 const crypto = require('crypto');
@@ -66,11 +70,11 @@ function addChapterArgs(args, chapterPlan, chapterInput, unsupportedSteps) {
 }
 
 function createChapterMetadataFile(context, chapterPlan) {
-  const cacheDir = context.librarySettings?.cache;
+  const cacheDir = resolveChapterMetadataDirectory(context);
 
   if (!cacheDir) {
     return {
-      error: 'Generated chapter marker file requires librarySettings.cache.',
+      error: 'Generated chapter marker file requires a writable Tdarr cache or work directory.',
     };
   }
 
@@ -98,6 +102,32 @@ function createChapterMetadataFile(context, chapterPlan) {
     path: chapterPath,
     count: markers.length,
   };
+}
+
+function resolveChapterMetadataDirectory(context) {
+  const sourceDirectory = context.file?.meta?.Directory || path.dirname(context.file?._id || context.file?.file || '');
+
+  if (isTdarrWorkDirectory(sourceDirectory)) {
+    return sourceDirectory;
+  }
+
+  const processDirectory = process.cwd();
+
+  if (isTdarrWorkDirectory(processDirectory)) {
+    return processDirectory;
+  }
+
+  const cacheRoot = context.librarySettings?.cache;
+
+  if (!cacheRoot) {
+    return '';
+  }
+
+  return cacheRoot;
+}
+
+function isTdarrWorkDirectory(directoryPath) {
+  return /(?:^|[\\/])tdarr-workDir/i.test(String(directoryPath || ''));
 }
 
 function buildChapterMarkers(durationSeconds, generatedCount, intervalSeconds) {
@@ -137,7 +167,7 @@ function renderChapterMetadata(markers, durationSeconds) {
     lines.push('TIMEBASE=1/1000');
     lines.push(`START=${Math.max(0, startSecond * 1000)}`);
     lines.push(`END=${Math.max(startSecond + 1, endSecond) * 1000}`);
-    lines.push(`title=CHAPTER ${chapterNum}`);
+    lines.push(`title=Chapter ${chapterNum}`);
     lines.push('');
   });
 

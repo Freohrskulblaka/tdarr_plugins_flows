@@ -9,6 +9,7 @@
  *   - Added media-type-aware generated chapter count bounds.
  * - 2026-07-15 - Freohrskulblaka: Skipped generated chapter planning when duration is unavailable.
  * - 2026-07-21 - Freohrskulblaka: Included the final end-of-file chapter marker in generated chapter counts.
+ * - 2026-08-04 - Freohrskulblaka: Prevent repeated generated-chapter remuxing on Tdarr cache outputs.
  */
 
 const DEFAULT_CHAPTER_INTERVAL_SECONDS = 300;
@@ -35,6 +36,20 @@ function planChapters(context) {
   }
 
   const mediaType = context.analysis.media?.type || 'Unknown';
+
+  if (isTdarrCacheOutput(context)) {
+    return {
+      action: 'skip',
+      count: 0,
+      existingCount: 0,
+      generatedCount: 0,
+      durationSeconds,
+      intervalSeconds: null,
+      mediaType,
+      shouldProcess: false,
+      reasons: ['No chapters were detected on a Tdarr cache output; generated chapter markers will not be re-applied.'],
+    };
+  }
 
   if (durationSeconds <= 0) {
     return {
@@ -64,6 +79,12 @@ function planChapters(context) {
     shouldProcess: true,
     reasons,
   };
+}
+
+function isTdarrCacheOutput(context) {
+  const fileId = context.analysis?.file?.id || context.file?._id || context.file?.file || '';
+
+  return String(fileId).includes('TdarrCacheFile');
 }
 
 function getDurationSeconds(context) {

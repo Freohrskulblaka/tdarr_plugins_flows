@@ -5,6 +5,8 @@
  * Description: Loads Tdarr inputs, resolves profile settings, validates disabled or invalid selections, and creates runtime context.
  * Updates:
  * - 2026-06-29 - Freohrskulblaka: Created configuration and context helpers for the media optimizer workflow.
+ * - 2026-08-04 - Freohrskulblaka: Added parsing for a single Sonarr/Radarr connection profile input without logging secrets.
+ * - 2026-08-04 - Freohrskulblaka: Defaulted classic responses to non-FFmpeg until execution is selected.
  */
 
 const { createLog } = require('./logging');
@@ -178,6 +180,55 @@ function createSettingsFromProfile(profile) {
   return settings;
 }
 
+function normalizeConnectionEntry(entry) {
+  const normalizedEntry = {
+    host: '',
+    apiKey: '',
+  };
+
+  if (!entry || typeof entry !== 'object') {
+    return normalizedEntry;
+  }
+
+  normalizedEntry.host = String(entry.host || entry.url || '').trim();
+  normalizedEntry.apiKey = String(entry.apiKey || entry.api_key || entry.key || '').trim();
+
+  return normalizedEntry;
+}
+
+function parseArrConnectionProfile(value) {
+  const rawValue = String(value || '').trim();
+  const connectionProfile = {
+    isConfigured: false,
+    isInvalid: false,
+    validationError: '',
+    sonarr: normalizeConnectionEntry(null),
+    radarr: normalizeConnectionEntry(null),
+  };
+
+  if (!rawValue) {
+    return connectionProfile;
+  }
+
+  try {
+    const parsedProfile = JSON.parse(rawValue);
+
+    connectionProfile.sonarr = normalizeConnectionEntry(parsedProfile.sonarr);
+    connectionProfile.radarr = normalizeConnectionEntry(parsedProfile.radarr);
+    connectionProfile.isConfigured = Boolean(
+      connectionProfile.sonarr.host
+        || connectionProfile.sonarr.apiKey
+        || connectionProfile.radarr.host
+        || connectionProfile.radarr.apiKey,
+    );
+  } catch (error) {
+    connectionProfile.isInvalid = true;
+    connectionProfile.validationError = `Invalid arrConnectionProfile JSON: ${error.message}`;
+  }
+
+  return connectionProfile;
+}
+
 function prepareConfig(inputs) {
   const videoProfile = resolveVideoProfile(inputs);
   const audioProfile = resolveProfile(AUDIO_PROFILES, inputs.audioProfile, 'audioProfile');
@@ -197,6 +248,11 @@ function prepareConfig(inputs) {
   const audioSettings = createSettingsFromProfile(audioProfile);
   const subtitleSettings = createSettingsFromProfile(subtitleProfile);
   const metadataSettings = createSettingsFromProfile(metadataProfile);
+  const arrConnectionProfile = parseArrConnectionProfile(inputs.arrConnectionProfile);
+
+  if (arrConnectionProfile.isInvalid) {
+    validationErrors.push(arrConnectionProfile.validationError);
+  }
 
   const config = {
     isInvalid: validationErrors.length > 0,
@@ -221,6 +277,9 @@ function prepareConfig(inputs) {
       subtitle: subtitleSettings,
       metadata: metadataSettings,
     },
+    lookup: {
+      arrConnectionProfile,
+    },
   };
 
   return config;
@@ -232,6 +291,7 @@ function createContext(file, librarySettings, config, otherArguments) {
     librarySettings,
     otherArguments,
     settings: config.settings,
+    lookup: config.lookup,
     messages: config.messages,
     isInvalid: config.isInvalid,
     response: {
@@ -239,7 +299,9 @@ function createContext(file, librarySettings, config, otherArguments) {
       preset: '',
       container: '.mkv',
       handBrakeMode: false,
-      FFmpegMode: true,
+      FFmpegMode: false,
+      ffmpegMode: false,
+      cliToUse: '',
       reQueueAfter: false,
     },
     log: createLog(config.settings.logLevel),

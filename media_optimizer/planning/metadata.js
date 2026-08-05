@@ -5,12 +5,15 @@
  * Description: Builds metadata cleanup decisions for global tags, file/video titles, and extra tag/data streams.
  * Updates:
  * - 2026-07-15 - Freohrskulblaka: Added focused metadata cleanup planning from normalized metadata facts.
+ * - 2026-08-04 - Freohrskulblaka: Ignored unavoidable FFmpeg encoder-only tags on Tdarr cache outputs.
+ * - 2026-08-04 - Freohrskulblaka: Ignored unavoidable FFmpeg encoder tags for all cleanup planning.
  */
 
 function planMetadata(context) {
   const metadata = context.analysis.metadata || {};
   const settings = context.settings.metadata || {};
-  const shouldStripGlobalTags = Boolean(settings.stripGlobalTags && metadata.globalTagKeys?.length > 0);
+  const globalTagKeys = getActionableGlobalTagKeys(context, metadata.globalTagKeys || []);
+  const shouldStripGlobalTags = Boolean(settings.stripGlobalTags && globalTagKeys.length > 0);
   const shouldRemoveFileTitle = Boolean(settings.removeFileTitle && metadata.hasFileTitle);
   const videoTitleTracks = (metadata.videoTitleStreams || []).map((stream) => planVideoTitleTrack(stream, settings));
   const extraTagTracks = (metadata.extraTagStreams || []).map((stream) => planExtraTagTrack(stream, settings));
@@ -30,13 +33,19 @@ function planMetadata(context) {
     removeVideoTitles: Boolean(settings.removeVideoTitles),
     removeExtraTagStreams: Boolean(settings.removeExtraTagStreams),
     writeCustomGlobalMetadata: Boolean(settings.writeCustomGlobalMetadata),
-    globalTagKeys: metadata.globalTagKeys || [],
+    globalTagKeys,
     fileTitle: metadata.fileTitle || '',
     videoTitleTracks,
     extraTagTracks,
     shouldProcess: shouldStripGlobalTags || shouldRemoveFileTitle || removedVideoTitleTracks.length > 0 || removedExtraTagTracks.length > 0,
     reasons,
   };
+}
+
+function getActionableGlobalTagKeys(context, globalTagKeys) {
+  const filteredKeys = globalTagKeys.filter((key) => String(key || '').toLowerCase() !== 'encoder');
+
+  return filteredKeys;
 }
 
 function planVideoTitleTrack(stream, settings) {

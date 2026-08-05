@@ -3,6 +3,8 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-21
  * Description: Shared helpers for rendering FFmpeg command arguments.
+ * Updates:
+ * - 2026-08-04 - Freohrskulblaka: Combine disposition flag changes into one FFmpeg operation per stream.
  */
 
 function addStreamMetadata(args, streamType, outputIndex, values) {
@@ -18,15 +20,15 @@ function addStreamMetadata(args, streamType, outputIndex, values) {
 }
 
 function addDisposition(args, streamType, outputIndex, dispositions) {
-  const dispositionValues = [];
+  const dispositionValue = Object.keys(dispositions)
+    .map((key) => {
+      const value = dispositions[key];
+      return `${value ? '+' : '-'}${key}`;
+    })
+    .join('');
 
-  Object.keys(dispositions).forEach((key) => {
-    const value = dispositions[key];
-    dispositionValues.push(`${value ? '+' : '-'}${key}`);
-  });
-
-  if (dispositionValues.length > 0) {
-    args.push(`-disposition:${streamType}:${outputIndex}`, dispositionValues.join(''));
+  if (dispositionValue) {
+    args.push(`-disposition:${streamType}:${outputIndex}`, dispositionValue);
   }
 }
 

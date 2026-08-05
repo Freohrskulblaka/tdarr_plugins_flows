@@ -5,6 +5,10 @@
  * Description: Resolves external media metadata and original language details from Tdarr variables, Sonarr, Radarr, and local analysis fallbacks.
  * Updates:
  * - 2026-06-29 - Freohrskulblaka: Split original-language and Sonarr/Radarr lookup helpers out of the analysis inventory library.
+ * - 2026-08-04 - Freohrskulblaka: Read Tdarr flow-style args.userVariables in addition to classic-plugin otherArguments.userVariables.
+ * - 2026-08-04 - Freohrskulblaka: Prefer a single classic Arr connection profile input before Tdarr variable fallback.
+ * - 2026-08-04 - Freohrskulblaka: Added a Radarr title/year fallback for movie-like filenames without embedded IDs.
+ * - 2026-08-04 - Freohrskulblaka: Added an Arr profile lookup mode while preserving legacy variable mode aliases.
  */
 
 const LANGUAGE_NAME_TO_ISO3 = {
@@ -33,19 +37,32 @@ const LANGUAGE_NAME_TO_ISO3 = {
 
 function getTdarrVariable(name, scope, otherArguments) {
   const normalizedScope = scope === 'library' ? 'library' : 'global';
-  return (
-    otherArguments?.userVariables?.[normalizedScope]?.[name]
-    || ''
-  );
+  const possibleRoots = [
+    otherArguments,
+    otherArguments?.args,
+    otherArguments?.args?.args,
+  ];
+
+  for (const root of possibleRoots) {
+    const value = root?.userVariables?.[normalizedScope]?.[name];
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return '';
 }
 
 function resolveLookupConfig(settings, otherArguments) {
   const lookupMode = settings.originalLanguageLookup || 'Filename and Streams Only';
-  const lookupUsesVariables = lookupMode === 'Sonarr/Radarr Global Variables'
+  const lookupUsesArrProfile = lookupMode === 'Sonarr/Radarr Arr Profile';
+  const lookupUsesLegacyVariables = lookupMode === 'Sonarr/Radarr Global Variables'
     || lookupMode === 'Sonarr/Radarr Library Variables';
+  const lookupUsesApi = lookupUsesArrProfile || lookupUsesLegacyVariables;
   const lookupConfig = {
     lookupMode,
-    lookupUsesVariables,
+    lookupUsesVariables: lookupUsesApi,
     lookupScope: null,
     sonarrHost: '',
     sonarrApiKey: '',
@@ -53,23 +70,45 @@ function resolveLookupConfig(settings, otherArguments) {
     radarrApiKey: '',
   };
 
-  if (!lookupUsesVariables) {
+  if (!lookupUsesApi) {
     return lookupConfig;
   }
 
-  const lookupScope = lookupMode === 'Sonarr/Radarr Library Variables' ? 'library' : 'global';
+  let lookupScope = 'arrConnectionProfile';
+
+  if (lookupMode === 'Sonarr/Radarr Library Variables') {
+    lookupScope = 'library';
+  } else if (lookupMode === 'Sonarr/Radarr Global Variables') {
+    lookupScope = 'global';
+  }
+
+  const arrConnectionProfile = settings?.lookup?.arrConnectionProfile || null;
 
   lookupConfig.lookupScope = lookupScope;
-  lookupConfig.sonarrHost = getTdarrVariable('MediaOptimizerSonarrHost', lookupScope, otherArguments);
-  lookupConfig.sonarrApiKey = getTdarrVariable('MediaOptimizerSonarrAPIKey', lookupScope, otherArguments);
-  lookupConfig.radarrHost = getTdarrVariable('MediaOptimizerRadarrHost', lookupScope, otherArguments);
-  lookupConfig.radarrApiKey = getTdarrVariable('MediaOptimizerRadarrAPIKey', lookupScope, otherArguments);
+  lookupConfig.sonarrHost = arrConnectionProfile?.sonarr?.host || '';
+  lookupConfig.sonarrApiKey = arrConnectionProfile?.sonarr?.apiKey || '';
+  lookupConfig.radarrHost = arrConnectionProfile?.radarr?.host || '';
+  lookupConfig.radarrApiKey = arrConnectionProfile?.radarr?.apiKey || '';
+
+  if (lookupUsesLegacyVariables) {
+    lookupConfig.sonarrHost = lookupConfig.sonarrHost
+      || getTdarrVariable('MediaOptimizerSonarrHost', lookupScope, otherArguments);
+    lookupConfig.sonarrApiKey = lookupConfig.sonarrApiKey
+      || getTdarrVariable('MediaOptimizerSonarrAPIKey', lookupScope, otherArguments);
+    lookupConfig.radarrHost = lookupConfig.radarrHost
+      || getTdarrVariable('MediaOptimizerRadarrHost', lookupScope, otherArguments);
+    lookupConfig.radarrApiKey = lookupConfig.radarrApiKey
+      || getTdarrVariable('MediaOptimizerRadarrAPIKey', lookupScope, otherArguments);
+  }
 
   return lookupConfig;
 }
 
 async function resolveOriginalLanguage(context) {
-  const lookupConfig = resolveLookupConfig(context.settings, context.otherArguments);
+  const lookupConfig = resolveLookupConfig(
+    Object.assign({}, context.settings, { lookup: context.lookup }),
+    context.otherArguments,
+  );
   const localLanguage = resolveLocalOriginalLanguage(context);
   const originalLanguage = {
     language: localLanguage.language,
@@ -134,17 +173,17 @@ async function resolveOriginalLanguageFromArr(context, lookupConfig, originalLan
     return;
   }
 
-  originalLanguage.errors.push('Media type is unknown; Sonarr/Radarr lookup skipped.');
+  await resolveUnknownMediaOriginalLanguage(context, lookupConfig, originalLanguage);
 }
 
 async function resolveMovieOriginalLanguage(context, lookupConfig, originalLanguage) {
-  if (!context.analysis.media.imdbId) {
-    originalLanguage.errors.push('IMDb ID was not found in the filename; Radarr lookup skipped.');
+  if (!lookupConfig.radarrHost || !lookupConfig.radarrApiKey) {
+    originalLanguage.errors.push('Radarr host or API key is missing; movie lookup skipped.');
     return;
   }
 
-  if (!lookupConfig.radarrHost || !lookupConfig.radarrApiKey) {
-    originalLanguage.errors.push('Radarr host or API key is missing; movie lookup skipped.');
+  if (!context.analysis.media.imdbId) {
+    await resolveMovieOriginalLanguageByTerm(context, lookupConfig, originalLanguage);
     return;
   }
 
@@ -162,6 +201,47 @@ async function resolveMovieOriginalLanguage(context, lookupConfig, originalLangu
     const movieData = await fetchJson(url);
 
     applyOriginalLanguageResult(originalLanguage, movieData, 'radarr');
+  } catch (error) {
+    originalLanguage.errors.push(`Radarr lookup failed: ${error.message}`);
+  }
+}
+
+async function resolveUnknownMediaOriginalLanguage(context, lookupConfig, originalLanguage) {
+  if (!lookupConfig.radarrHost || !lookupConfig.radarrApiKey) {
+    originalLanguage.errors.push('Media type is unknown and Radarr host or API key is missing; lookup skipped.');
+    return;
+  }
+
+  await resolveMovieOriginalLanguageByTerm(context, lookupConfig, originalLanguage);
+
+  if (!originalLanguage.apiLookupAttempted) {
+    originalLanguage.errors.push('Media type is unknown; Sonarr/Radarr lookup skipped.');
+  }
+}
+
+async function resolveMovieOriginalLanguageByTerm(context, lookupConfig, originalLanguage) {
+  const term = createMovieLookupTerm(context);
+
+  if (!term) {
+    originalLanguage.errors.push('Movie lookup term could not be derived from the filename; Radarr lookup skipped.');
+    return;
+  }
+
+  originalLanguage.apiLookupAttempted = true;
+
+  try {
+    const url = buildApiUrl(
+      lookupConfig.radarrHost,
+      '/api/v3/movie/lookup',
+      {
+        term,
+        apikey: lookupConfig.radarrApiKey,
+      },
+    );
+    const movieData = await fetchJson(url);
+    const movie = Array.isArray(movieData) ? movieData[0] : movieData;
+
+    applyOriginalLanguageResult(originalLanguage, movie, 'radarr');
   } catch (error) {
     originalLanguage.errors.push(`Radarr lookup failed: ${error.message}`);
   }
@@ -197,6 +277,31 @@ async function resolveSeriesOriginalLanguage(context, lookupConfig, originalLang
   } catch (error) {
     originalLanguage.errors.push(`Sonarr lookup failed: ${error.message}`);
   }
+}
+
+function createMovieLookupTerm(context) {
+  const nameNoExtension = context.analysis?.file?.nameNoExtension || '';
+  const normalizedName = String(nameNoExtension)
+    .replace(/[._]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const yearMatch = normalizedName.match(/^(.*?)(?:\s*[\[(]?((?:19|20)\d{2})[\])]?)(?:\s|$)/);
+
+  if (!yearMatch) {
+    return normalizedName;
+  }
+
+  const title = yearMatch[1]
+    .replace(/[-[\](){}]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const year = yearMatch[2];
+
+  if (!title || !year) {
+    return normalizedName;
+  }
+
+  return `${title} ${year}`;
 }
 
 function applyOriginalLanguageResult(originalLanguage, mediaData, source) {

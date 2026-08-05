@@ -15,6 +15,8 @@
  *   - Ordered fuller subtitle tracks ahead of sparse variants within each language and type.
  *   - Added conservative subtitle title standardization while preserving anime subtitle titles.
  * - 2026-07-15 - Freohrskulblaka: Skipped external SRT imports when an equivalent embedded text subtitle already exists.
+ * - 2026-08-04 - Freohrskulblaka: Avoid reprocessing files only to retitle embedded subtitles or change subtitle dispositions.
+ * - 2026-08-04 - Freohrskulblaka: Tracked already-embedded external SRT sidecars so no-op reruns can clean them up.
  */
 
 const {
@@ -43,7 +45,8 @@ function planSubtitles(context) {
   const languageOrder = createFinalSubtitleLanguageOrder(context);
   const preserveExistingTitles = shouldPreserveExistingSubtitleTitles(context);
   const embeddedTracks = subtitleStreams.map((stream, sourceOrder) => createSubtitleTrack(stream, sourceOrder, preserveExistingTitles));
-  const externalTracks = discoverExternalSrtImports(context, languageOrder, preserveExistingTitles);
+  const externalDiscovery = discoverExternalSrtImports(context, languageOrder, preserveExistingTitles);
+  const externalTracks = externalDiscovery.imports;
   const candidateTracks = [...embeddedTracks, ...externalTracks];
   const keptTracks = selectSubtitleTracks(candidateTracks, context, languageOrder);
   const removedTracks = candidateTracks.filter((track) => track.action === 'remove');
@@ -57,6 +60,7 @@ function planSubtitles(context) {
     tracks: outputTracks,
     removedTracks,
     externalImports,
+    matchedExternalSubtitles: externalDiscovery.matchedExternalSubtitles,
     reasons,
     shouldProcess,
   };
@@ -308,33 +312,77 @@ function discoverExternalSrtImports(context, languageOrder, preserveExistingTitl
 
   const embeddedSubtitleTracks = context.analysis.streams.subtitle.items
     .map((stream, sourceOrder) => createSubtitleTrack(stream, sourceOrder, preserveExistingTitles));
-  const imports = (context.analysis.externalSubtitles || []).reduce((plannedImports, externalSubtitle) => {
+  const discovery = (context.analysis.externalSubtitles || []).reduce((result, externalSubtitle) => {
     if (!languageOrder.includes(externalSubtitle.language)) {
-      return plannedImports;
+      return result;
     }
 
-    if (hasEquivalentEmbeddedTextSubtitle(embeddedSubtitleTracks, externalSubtitle)) {
-      return plannedImports;
+    const embeddedMatch = findEquivalentEmbeddedTextSubtitle(embeddedSubtitleTracks, externalSubtitle, preserveExistingTitles);
+    if (embeddedMatch) {
+      result.matchedExternalSubtitles.push({
+        sourcePath: externalSubtitle.sourcePath,
+        fileName: externalSubtitle.fileName,
+        language: externalSubtitle.language,
+        languageVariant: externalSubtitle.languageVariant,
+        matchedSourceIndex: embeddedMatch.sourceIndex,
+        matchedTitle: embeddedMatch.title,
+      });
+      return result;
     }
 
-    const sourceOrder = context.analysis.streams.subtitle.items.length + plannedImports.length;
-    plannedImports.push(createExternalSubtitleTrack(externalSubtitle, sourceOrder, preserveExistingTitles));
+    const sourceOrder = context.analysis.streams.subtitle.items.length + result.imports.length;
+    result.imports.push(createExternalSubtitleTrack(externalSubtitle, sourceOrder, preserveExistingTitles));
 
-    return plannedImports;
-  }, []);
+    return result;
+  }, {
+    imports: [],
+    matchedExternalSubtitles: [],
+  });
 
-  return imports;
+  return discovery;
 }
 
-function hasEquivalentEmbeddedTextSubtitle(embeddedSubtitleTracks, externalSubtitle) {
-  return embeddedSubtitleTracks.some((track) => {
+function findEquivalentEmbeddedTextSubtitle(embeddedSubtitleTracks, externalSubtitle, preserveExistingTitles) {
+  return embeddedSubtitleTracks.find((track) => {
     const sameLanguage = track.language === externalSubtitle.language;
     const sameVariant = (track.languageVariant || '') === (externalSubtitle.languageVariant || '');
-    const usableTextSubtitle = track.subtitleType === 'text'
+    const usableTextSubtitle = isSrtLikeSubtitle(track)
       && !track.isEmpty
       && !track.isCommentary;
 
-    return sameLanguage && sameVariant && usableTextSubtitle && subtitleMetricsMatch(track, externalSubtitle);
+    return sameLanguage
+      && sameVariant
+      && usableTextSubtitle
+      && subtitleIdentityMatches(track, externalSubtitle, preserveExistingTitles);
+  });
+}
+
+function subtitleIdentityMatches(embeddedSubtitle, externalSubtitle, preserveExistingTitles) {
+  if (subtitleMetricsMatch(embeddedSubtitle, externalSubtitle)) {
+    return true;
+  }
+
+  if (subtitleCountMetricsConflict(embeddedSubtitle, externalSubtitle)) {
+    return false;
+  }
+
+  const desiredExternalTitle = createSubtitleTitle(externalSubtitle, preserveExistingTitles);
+  const embeddedTitle = normalizeSubtitleIdentityText(embeddedSubtitle.title);
+  const externalTitle = normalizeSubtitleIdentityText(desiredExternalTitle);
+
+  return Boolean(embeddedTitle && externalTitle && embeddedTitle === externalTitle);
+}
+
+function subtitleCountMetricsConflict(embeddedSubtitle, externalSubtitle) {
+  const countPairs = [
+    [embeddedSubtitle.frameCount, externalSubtitle.frameCount],
+    [embeddedSubtitle.elementCount, externalSubtitle.elementCount],
+  ];
+
+  return countPairs.some(([embeddedCount, externalCount]) => {
+    return hasMetric(embeddedCount)
+      && hasMetric(externalCount)
+      && Number(embeddedCount) !== Number(externalCount);
   });
 }
 
@@ -366,6 +414,21 @@ function hasMetric(value) {
   return value !== undefined && value !== null && value !== '';
 }
 
+function isSrtLikeSubtitle(track) {
+  const codec = String(track.codec || '').toLowerCase();
+  const formatLabel = String(track.formatLabel || '').toLowerCase();
+
+  return track.subtitleType === 'text'
+    && (codec === 'subrip' || codec === 'srt' || formatLabel === 'srt');
+}
+
+function normalizeSubtitleIdentityText(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
 function shouldProcessSubtitles(embeddedTracks, outputTracks, removedTracks, externalImports) {
   const hasRemovedTracks = removedTracks.some((track) => track.sourceKind === 'embedded');
   const hasExternalImports = externalImports.length > 0;
@@ -376,17 +439,8 @@ function shouldProcessSubtitles(embeddedTracks, outputTracks, removedTracks, ext
   const hasEmbeddedOrderChanges = keptEmbeddedTracks.some((track, index) => {
     return track.sourceOrder !== keptEmbeddedSourceOrder[index];
   });
-  const hasDefaultChanges = outputTracks.some((track) => {
-    return track.sourceKind === 'embedded' && track.default !== track.currentDefault;
-  });
-  const hasTitleChanges = outputTracks.some((track) => {
-    return track.sourceKind === 'embedded' && track.titleNeedsUpdate;
-  });
-  const hasForcedCleanup = embeddedTracks.some((track) => {
-    return track.currentForced;
-  });
 
-  return hasRemovedTracks || hasExternalImports || hasEmbeddedOrderChanges || hasDefaultChanges || hasTitleChanges || hasForcedCleanup;
+  return hasRemovedTracks || hasExternalImports || hasEmbeddedOrderChanges;
 }
 
 function normalizeRank(rank) {

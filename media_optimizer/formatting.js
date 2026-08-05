@@ -8,6 +8,8 @@
  * - 2026-06-30 - Freohrskulblaka: Updated formatting for sectioned processing plans.
  * - 2026-07-06 - Freohrskulblaka: Updated video bitrate formatting for nested bitrate profiles.
  * - 2026-07-15 - Freohrskulblaka: Added metadata cleanup detail rendering.
+ * - 2026-08-04 - Freohrskulblaka: Added compact no-op summary logging for already-compliant files.
+ * - 2026-08-04 - Freohrskulblaka: Hid diagnostic reason breadcrumbs from normal no-op summaries.
  */
 
 function renderFinalTrackTable(plan) {
@@ -36,6 +38,152 @@ function renderFinalTrackTable(plan) {
   }
 
   return lines.join('\n');
+}
+
+function renderPlanSummary(plan, analysis, options = {}) {
+  const lines = [];
+  const includeReasons = options.includeReasons === true;
+
+  lines.push(`Should process: ${plan.shouldProcess ? 'yes' : 'no'}`);
+  lines.push(`Container: ${plan.container.sourceContainer || 'unknown'} -> ${plan.container.targetContainer}`);
+  lines.push(`Video: ${summarizeVideo(plan.video)}`);
+  lines.push(`Audio: ${summarizeAudio(plan.audio)}`);
+  lines.push(`Subtitles: ${summarizeSubtitles(plan.subtitles)}`);
+  lines.push(`Attachments: ${summarizeAttachments(plan.attachments)}`);
+  lines.push(`Chapters: ${summarizeChapters(plan.chapters)}`);
+  lines.push(`Metadata: ${summarizeMetadata(plan.metadata)}`);
+
+  const originalLanguage = analysis?.originalLanguage;
+  if (originalLanguage?.language) {
+    const source = originalLanguage.source ? ` from ${originalLanguage.source}` : '';
+    lines.push(`Original language: ${originalLanguage.language}${source}`);
+  }
+
+  if (includeReasons && plan.reasons.length > 0) {
+    lines.push('');
+    lines.push('Reasons:');
+    plan.reasons.forEach((reason) => {
+      lines.push(`  - ${reason}`);
+    });
+  }
+
+  return lines.join('\n');
+}
+
+function summarizeVideo(videoPlan) {
+  const keptCount = videoPlan.tracks.filter((track) => track.action === 'copy').length;
+  const transcodeCount = videoPlan.tracks.filter((track) => track.action === 'transcode').length;
+
+  if (transcodeCount === 0) {
+    return `keeping ${keptCount} video track${keptCount === 1 ? '' : 's'}`;
+  }
+
+  return `keeping ${keptCount}, transcoding ${transcodeCount}`;
+}
+
+function summarizeAudio(audioPlan) {
+  const keptCount = audioPlan.tracks.filter((track) => track.action === 'copy').length;
+  const generatedCount = audioPlan.tracks.filter((track) => track.generated || track.action !== 'copy').length;
+  const removedCount = audioPlan.removedTracks.length;
+  const channelSummary = summarizeByCount(audioPlan.tracks, (track) => `${track.channels || 'unknown'}ch`);
+  const parts = [`retaining ${audioPlan.tracks.length} audio track${audioPlan.tracks.length === 1 ? '' : 's'}`];
+
+  if (channelSummary) {
+    parts.push(channelSummary);
+  }
+
+  if (generatedCount > 0) {
+    parts.push(`generating ${generatedCount}`);
+  }
+
+  if (removedCount > 0) {
+    parts.push(`removing ${removedCount}`);
+  } else if (keptCount === audioPlan.tracks.length) {
+    parts.push('all copied');
+  }
+
+  return parts.join(', ');
+}
+
+function summarizeSubtitles(subtitlePlan) {
+  const embeddedCount = subtitlePlan.tracks.filter((track) => track.sourceKind !== 'external').length;
+  const externalCount = subtitlePlan.tracks.filter((track) => track.sourceKind === 'external').length;
+  const removedCount = subtitlePlan.removedTracks.length;
+  const languageSummary = summarizeByCount(subtitlePlan.tracks, (track) => track.languageLabel || track.language || 'unknown');
+  const parts = [`retaining ${subtitlePlan.tracks.length} subtitle track${subtitlePlan.tracks.length === 1 ? '' : 's'}`];
+
+  if (embeddedCount > 0 && externalCount > 0) {
+    parts.push(`${embeddedCount} embedded, ${externalCount} external`);
+  } else if (externalCount > 0) {
+    parts.push(`${externalCount} external`);
+  } else if (embeddedCount > 0) {
+    parts.push(`${embeddedCount} embedded`);
+  }
+
+  if (languageSummary) {
+    parts.push(languageSummary);
+  }
+
+  if (removedCount > 0) {
+    parts.push(`removing ${removedCount}`);
+  }
+
+  return parts.join(', ');
+}
+
+function summarizeAttachments(attachmentPlan) {
+  if (attachmentPlan.tracks.length === 0) {
+    return 'none';
+  }
+
+  return `keeping ${attachmentPlan.keptCount}, removing ${attachmentPlan.removedCount}, fonts ${attachmentPlan.fontCount}`;
+}
+
+function summarizeChapters(chapterPlan) {
+  const count = getChapterDisplayCount(chapterPlan);
+  const detail = count === 1 ? 'chapter marker source' : 'chapter markers';
+
+  return `${chapterPlan.action} ${count} ${detail}`;
+}
+
+function summarizeMetadata(metadataPlan) {
+  const cleanupItems = [];
+
+  if (metadataPlan.stripGlobalTags && metadataPlan.globalTagKeys.length > 0) {
+    cleanupItems.push(`${metadataPlan.globalTagKeys.length} global tag${metadataPlan.globalTagKeys.length === 1 ? '' : 's'}`);
+  }
+
+  if (metadataPlan.removeFileTitle && metadataPlan.fileTitle) {
+    cleanupItems.push('file title');
+  }
+
+  if (metadataPlan.removeVideoTitles && metadataPlan.videoTitleTracks.length > 0) {
+    cleanupItems.push(`${metadataPlan.videoTitleTracks.length} video title${metadataPlan.videoTitleTracks.length === 1 ? '' : 's'}`);
+  }
+
+  if (metadataPlan.removeExtraTagStreams && metadataPlan.extraTagTracks.length > 0) {
+    cleanupItems.push(`${metadataPlan.extraTagTracks.length} extra tag stream${metadataPlan.extraTagTracks.length === 1 ? '' : 's'}`);
+  }
+
+  if (cleanupItems.length === 0) {
+    return 'no cleanup needed';
+  }
+
+  return `cleanup planned for ${cleanupItems.join(', ')}`;
+}
+
+function summarizeByCount(items, getLabel) {
+  const counts = new Map();
+
+  items.forEach((item) => {
+    const label = getLabel(item);
+    counts.set(label, (counts.get(label) || 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .sort((left, right) => String(left[0]).localeCompare(String(right[0])))
+    .map(([label, count]) => `${count} ${label}`)
+    .join(', ');
 }
 
 function renderVideo(lines, videoPlan) {
@@ -97,6 +245,7 @@ function renderAttachments(lines, attachmentPlan) {
 
 function renderChapters(lines, chapterPlan) {
   const details = [];
+  const chapterCount = getChapterDisplayCount(chapterPlan);
 
   if (chapterPlan.durationSeconds > 0) {
     details.push(`duration=${Math.floor(chapterPlan.durationSeconds)}s`);
@@ -111,7 +260,7 @@ function renderChapters(lines, chapterPlan) {
   }
 
   const detailText = details.length > 0 ? ` ${details.join(' ')}` : '';
-  lines.push(`Chapters: ${chapterPlan.action} (${chapterPlan.count})${detailText}`);
+  lines.push(`Chapters: ${chapterPlan.action} (${chapterCount})${detailText}`);
 }
 
 function renderMetadata(lines, metadataPlan) {
@@ -131,6 +280,11 @@ function renderMetadata(lines, metadataPlan) {
   });
 }
 
+function getChapterDisplayCount(chapterPlan) {
+  return chapterPlan.entryCount || chapterPlan.markerCount || chapterPlan.count;
+}
+
 module.exports = {
   renderFinalTrackTable,
+  renderPlanSummary,
 };

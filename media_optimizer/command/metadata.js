@@ -3,6 +3,8 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-21
  * Description: Renders planned global and stream metadata cleanup into FFmpeg output arguments.
+ * Updates:
+ * - 2026-08-04 - Freohrskulblaka: Strip global metadata without removing generated chapter titles.
  */
 
 const { findOutputIndex, quoteArg } = require('./args');
@@ -11,7 +13,7 @@ function addMetadataArgs(args, plan, streamIndexes, warnings, unsupportedSteps) 
   const metadataPlan = plan.metadata || {};
 
   if (metadataPlan.stripGlobalTags) {
-    args.push('-map_metadata', '-1');
+    args.push('-map_metadata:g', '-1');
   }
 
   if (metadataPlan.removeFileTitle) {

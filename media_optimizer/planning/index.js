@@ -10,6 +10,8 @@
  * - 2026-07-13 - Freohrskulblaka: Extracted attachment and chapter planning into focused planning modules.
  * - 2026-07-15 - Freohrskulblaka: Extracted metadata planning into a focused planning module.
  * - 2026-07-15 - Freohrskulblaka: Added a command placeholder for the FFmpeg renderer output.
+ * - 2026-08-04 - Freohrskulblaka: Suppressed cleanup-only cache output loops in cyclic classic stacks.
+ * - 2026-08-04 - Freohrskulblaka: Suppressed genpts-only original-file remux loops.
  */
 
 const { planAttachments } = require('./attachment');
@@ -93,25 +95,39 @@ function validateRequiredStreams(context) {
 function planContainer(context) {
   const reasons = [];
   const shouldRemux = context.analysis.file.needsRemux;
+  const isCacheOutput = isTdarrCacheOutput(context);
+  const useGenpts = Boolean(context.analysis.file.useGenpts && shouldRemux && !isCacheOutput);
 
   if (shouldRemux) {
     reasons.push(`Container ${context.analysis.file.container} does not match target ${context.settings.output.container}.`);
   }
 
-  if (context.analysis.file.useGenpts) {
+  if (useGenpts) {
     reasons.push('One or more streams have missing or unavailable duration; genpts may be required.');
+  } else if (context.analysis.file.useGenpts && isCacheOutput) {
+    reasons.push('Genpts-only remux is skipped on Tdarr cache outputs to avoid cyclic cleanup passes.');
+  } else if (context.analysis.file.useGenpts && !shouldRemux) {
+    reasons.push('Genpts-only remux is skipped because the container already matches the target.');
   }
 
   const containerPlan = {
     sourceContainer: context.analysis.file.container,
     targetContainer: context.settings.output.container,
     shouldRemux,
-    useGenpts: context.analysis.file.useGenpts,
-    shouldProcess: shouldRemux || context.analysis.file.useGenpts,
+    useGenpts,
+    shouldProcess: shouldRemux || useGenpts,
     reasons,
   };
 
   return containerPlan;
+}
+
+function isTdarrCacheOutput(context) {
+  return [
+    context.analysis?.file?.id,
+    context.file?._id,
+    context.file?.file,
+  ].some((value) => String(value || '').includes('TdarrCacheFile'));
 }
 
 function collectPlanReasons(sections) {

@@ -9,6 +9,8 @@
  * - 2026-07-01 - Freohrskulblaka: Moved video-specific stream enrichment into the video analysis library.
  * - 2026-07-13 - Freohrskulblaka: Extracted file, attachment, chapter, and media identity source facts into focused analysis modules.
  * - 2026-07-15 - Freohrskulblaka: Moved metadata source facts into a focused analysis module.
+ * - 2026-08-04 - Freohrskulblaka: Passed FFprobe chapter data into chapter analysis for Tdarr cache-output detection.
+ * - 2026-08-04 - Freohrskulblaka: Passed file context into chapter analysis for direct chapter probing.
  */
 
 const { analyzeAttachmentStreams } = require('./attachment');
@@ -23,9 +25,10 @@ const { analyzeExternalSubtitleFiles, analyzeSubtitleStreams } = require('./subt
 function analyzeFile(context) {
   const streams = context.file?.ffProbeData?.streams || [];
   const mediaInfoTracks = context.file?.mediaInfo?.track || [];
+  const ffProbeChapters = context.file?.ffProbeData?.chapters || [];
   const fileInfo = analyzeFileInfo(context.file, context.settings);
   const streamInfo = analyzeStreams(streams, mediaInfoTracks, context.file);
-  const chapterInfo = analyzeChapters(mediaInfoTracks);
+  const chapterInfo = analyzeChapters(mediaInfoTracks, ffProbeChapters, context.file, context);
   const mediaInfo = analyzeMediaInfo(fileInfo.nameNoExtension, mediaInfoTracks);
   const externalSubtitles = analyzeExternalSubtitleFiles(fileInfo);
   const metadataInfo = analyzeMetadata(streams, context.file?.ffProbeData?.format?.tags || {});
