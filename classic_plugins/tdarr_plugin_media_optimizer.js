@@ -3,17 +3,43 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-06-29
  * Description: Tdarr classic plugin entrypoint that orchestrates media optimizer configuration, analysis, planning, and response logging.
- * Updates:
- * - 2026-06-29 - Freohrskulblaka: Created modular classic plugin entrypoint for the media optimizer workflow.
- * - 2026-07-15 - Freohrskulblaka: Added dry-run FFmpeg command preview wiring.
+ * Changelog: ../docs/media_optimizer_changelog.md
  */
 
-const { loadInputs, prepareConfig, createContext } = require('../media_optimizer/config');
-const { analyzeFile, summarizeAnalysis } = require('../media_optimizer/analysis');
-const { resolveOriginalLanguage } = require('../media_optimizer/metadata_lookup');
-const { buildProcessingPlan } = require('../media_optimizer/planning');
-const { renderFinalTrackTable } = require('../media_optimizer/formatting');
-const { buildFfmpegCommand, renderFfmpegCommandPreview } = require('../media_optimizer/ffmpeg_command');
+const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-arr-profile-2026-08-05-24';
+
+function clearMediaOptimizerModuleCache() {
+  const path = require('path');
+  const mediaOptimizerSegment = `${path.sep}media_optimizer${path.sep}`;
+
+  Object.keys(require.cache).forEach((cachedPath) => {
+    if (cachedPath.includes(mediaOptimizerSegment)) {
+      delete require.cache[cachedPath];
+    }
+  });
+}
+
+function requireFresh(modulePath) {
+  const resolvedPath = require.resolve(modulePath);
+
+  delete require.cache[resolvedPath];
+
+  return require(modulePath);
+}
+
+function loadOptimizerModules() {
+  clearMediaOptimizerModuleCache();
+
+  return {
+    config: requireFresh('../media_optimizer/config'),
+    analysis: requireFresh('../media_optimizer/analysis'),
+    metadataLookup: requireFresh('../media_optimizer/metadata_lookup'),
+    planning: requireFresh('../media_optimizer/planning'),
+    formatting: requireFresh('../media_optimizer/formatting'),
+    ffmpegCommand: requireFresh('../media_optimizer/ffmpeg_command'),
+    inPlaceActions: requireFresh('../media_optimizer/actions/in_place'),
+  };
+}
 
 // #region Plugin Metadata
 function details() {
@@ -23,7 +49,7 @@ function details() {
     Stage: 'Pre-processing',
     Type: 'Video, Audio, Subtitle',
     Operation: 'Transcode',
-    Description: 'Profile-driven media optimizer that plans video, audio, subtitle, attachment, chapter, and metadata cleanup in one dry-run-safe workflow. Sonarr/Radarr lookup modes require Tdarr global or library variables named MediaOptimizerSonarrHost, MediaOptimizerSonarrAPIKey, MediaOptimizerRadarrHost, and MediaOptimizerRadarrAPIKey.',
+    Description: 'Profile-driven media optimizer that plans video, audio, subtitle, attachment, chapter, and metadata cleanup in one dry-run-safe workflow. Sonarr/Radarr lookup uses the Arr connection profile input.',
     Version: '0.1.0',
     Tags: 'pre-processing, ffmpeg, media optimizer, configurable',
     Inputs: [
@@ -115,9 +141,16 @@ function details() {
         defaultValue: 'Filename and Streams Only',
         inputUI: {
           type: 'dropdown',
-          options: ['Disabled', 'Filename and Streams Only', 'Sonarr/Radarr Global Variables', 'Sonarr/Radarr Library Variables'],
+          options: ['Disabled', 'Filename and Streams Only', 'Sonarr/Radarr Arr Profile'],
         },
-        tooltip: 'Select how original language should be resolved. Sonarr/Radarr modes read Tdarr variables named MediaOptimizerSonarrHost, MediaOptimizerSonarrAPIKey, MediaOptimizerRadarrHost, and MediaOptimizerRadarrAPIKey. Keys are never logged.',
+        tooltip: 'Select how original language should be resolved. Sonarr/Radarr Arr Profile uses the single arrConnectionProfile JSON input. Keys are not included in Media Optimizer logs.',
+      },
+      {
+        name: 'arrConnectionProfile',
+        type: 'string',
+        defaultValue: '',
+        inputUI: { type: 'text' },
+        tooltip: 'Optional JSON object for Sonarr/Radarr lookup. Example: {"sonarr":{"host":"10.0.0.10:8989","apiKey":"key"},"radarr":{"host":"10.0.0.10:7878","apiKey":"key"}}',
       },
       {
         name: 'dryRun',
@@ -146,12 +179,22 @@ function details() {
 
 // #region Plugin Entry Point
 async function plugin(file, librarySettings, inputs, otherArguments) {
+  const {
+    config: { loadInputs, prepareConfig, createContext },
+    analysis: { analyzeFile, summarizeAnalysis },
+    metadataLookup: { resolveOriginalLanguage },
+    planning: { buildProcessingPlan },
+    formatting: { renderFinalTrackTable, renderPlanSummary },
+    ffmpegCommand: { buildFfmpegCommand, renderFfmpegCommandPreview },
+    inPlaceActions: { runInPlaceActions },
+  } = loadOptimizerModules();
   const rawInputs = loadInputs(inputs, details);
   const config = prepareConfig(rawInputs);
   const context = createContext(file, librarySettings, config, otherArguments);
   const runMode = context.settings.dryRun ? 'Dry Run' : 'Process';
 
   context.log.section(`Media Optimizer ${runMode}`);
+  context.log.info('Runtime marker', MEDIA_OPTIMIZER_RUNTIME_MARKER);
   context.log.info('Resolved settings', context.settings);
   if (config.isInvalid) {
     context.log.error('Configuration is invalid', config.messages.validationErrors);
@@ -169,19 +212,31 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
   context.analysis.originalLanguage = await resolveOriginalLanguage(context);
   context.plan = buildProcessingPlan(context);
 
-  context.log.info('Analysis summary', summarizeAnalysis(context.analysis));
   if (!context.plan.isValid) {
+    context.log.info('Analysis summary', summarizeAnalysis(context.analysis));
     context.log.error('Processing plan is invalid', context.plan.validation.reasons);
     return createResponse(context);
   }
 
   context.plan.command = buildFfmpegCommand(context);
   context.plan.ffmpegArgs = context.plan.command.args;
+  runInPlaceActions(context);
 
-  context.log.section('Planned final track table');
-  context.log.info(renderFinalTrackTable(context.plan));
-  context.log.section('Planned FFmpeg command');
-  context.log.info(renderFfmpegCommandPreview(context.plan.command));
+  if (context.plan.shouldProcess || context.settings.dryRun) {
+    context.log.info('Analysis summary', summarizeAnalysis(context.analysis));
+    context.log.section('Planned final track table');
+    context.log.info(renderFinalTrackTable(context.plan));
+    context.log.section('Planned FFmpeg command');
+    context.log.info(renderFfmpegCommandPreview(context.plan.command));
+  } else {
+    const isDebugNoOp = context.settings.logLevel === 'debug';
+
+    if (isDebugNoOp) {
+      context.log.info('Analysis summary', summarizeAnalysis(context.analysis));
+    }
+    context.log.section('Compliance summary');
+    context.log.info(renderPlanSummary(context.plan, context.analysis, { includeReasons: isDebugNoOp }));
+  }
 
   return createResponse(context);
 }
@@ -192,11 +247,15 @@ function createResponse(context) {
   const response = Object.assign({}, context.response, {
     processFile: canExecute,
     preset: canExecute ? command.preset : '',
+    FFmpegMode: canExecute,
+    ffmpegMode: canExecute,
+    cliToUse: canExecute ? 'ffmpeg' : '',
     infoLog: context.log.toString(),
   });
 
   return response;
 }
+
 // #endregion
 
 // #region Exports
