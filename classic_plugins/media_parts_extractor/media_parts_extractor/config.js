@@ -6,7 +6,7 @@
  */
 
 const path = require('path');
-const { createLog } = require('../../media_optimizer/media_optimizer/runtime/logging');
+const { createLog } = require('./runtime/logging');
 
 function loadTdarrMethodsLib() {
   const candidatePaths = [
