@@ -12,6 +12,7 @@
 const { createLog } = require('./logging');
 const { createProfileConfig } = require('./profiles');
 const { loadTdarrMethodsLib } = require('./tdarr_methods');
+const { parseArrConnectionProfile } = require('../integrations/arr_connection_profile');
 
 function loadInputs(inputs, details) {
   const lib = loadTdarrMethodsLib();
@@ -19,65 +20,11 @@ function loadInputs(inputs, details) {
   return userInputs;
 }
 
-function parseList(value) {
-  const rawValue = String(value || '');
-  const rawItems = rawValue.split(',');
-  const normalizedItems = rawItems.map((item) => item.trim().toLowerCase());
-  const parsedItems = normalizedItems.filter(Boolean);
-
-  return parsedItems;
-}
-
-function normalizeConnectionEntry(entry) {
-  const normalizedEntry = {
-    host: '',
-    apiKey: '',
-  };
-
-  if (!entry || typeof entry !== 'object') {
-    return normalizedEntry;
-  }
-
-  normalizedEntry.host = String(entry.host || entry.url || '').trim();
-  normalizedEntry.apiKey = String(entry.apiKey || entry.api_key || entry.key || '').trim();
-
-  return normalizedEntry;
-}
-
-function parseArrConnectionProfile(value) {
-  const rawValue = String(value || '').trim();
-  const connectionProfile = {
-    isConfigured: false,
-    isInvalid: false,
-    validationError: '',
-    sonarr: normalizeConnectionEntry(null),
-    radarr: normalizeConnectionEntry(null),
-  };
-
-  if (!rawValue) {
-    return connectionProfile;
-  }
-
-  try {
-    const parsedProfile = JSON.parse(rawValue);
-
-    connectionProfile.sonarr = normalizeConnectionEntry(parsedProfile.sonarr);
-    connectionProfile.radarr = normalizeConnectionEntry(parsedProfile.radarr);
-    connectionProfile.isConfigured = Boolean(
-      connectionProfile.sonarr.host
-        || connectionProfile.sonarr.apiKey
-        || connectionProfile.radarr.host
-        || connectionProfile.radarr.apiKey,
-    );
-  } catch (error) {
-    connectionProfile.isInvalid = true;
-    connectionProfile.validationError = `Invalid arrConnectionProfile JSON: ${error.message}`;
-  }
-
-  return connectionProfile;
-}
-
 function prepareConfig(inputs) {
+  const parseList = (value) => String(value || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
   const profileConfig = createProfileConfig(inputs);
   const validationErrors = [...profileConfig.messages.validationErrors];
   const disabledReasons = [...profileConfig.messages.disabledReasons];
