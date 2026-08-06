@@ -6,8 +6,14 @@
  */
 
 function loadTdarrMethodsLib() {
-  const candidatePaths = createParentCandidatePaths('methods/lib', 4);
+  const candidatePaths = [];
   const errors = [];
+  let parentPath = '..';
+
+  for (let depth = 1; depth <= 4; depth += 1) {
+    candidatePaths.push(`${parentPath}/methods/lib`);
+    parentPath = `../${parentPath}`;
+  }
 
   for (const candidatePath of candidatePaths) {
     try {
@@ -24,18 +30,6 @@ function loadTdarrMethodsLib() {
   }
 
   throw new Error(`Unable to load Tdarr methods/lib from Media Optimizer package. Tried: ${errors.join(' | ')}`);
-}
-
-function createParentCandidatePaths(targetPath, maxDepth) {
-  const candidatePaths = [];
-  let parentPath = '..';
-
-  for (let depth = 1; depth <= maxDepth; depth += 1) {
-    candidatePaths.push(`${parentPath}/${targetPath}`);
-    parentPath = `../${parentPath}`;
-  }
-
-  return candidatePaths;
 }
 
 module.exports = {
