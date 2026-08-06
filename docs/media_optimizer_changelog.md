@@ -263,9 +263,9 @@ reloads plugin files.
 Moved the Media Optimizer support modules into a more cohesive layout under
 `runtime/`, `pipeline/`, `domains/`, `integrations/`, and `shared/`.
 
-The classic plugin entrypoint now imports the new structure directly. Small
-compatibility modules remain at the library root for existing local harnesses
-and sibling plugin reuse.
+The classic plugin entrypoint, sibling plugins, and local harnesses now import
+the current structure directly, leaving no root compatibility modules in the
+release-facing support package.
 
 ## 2026-07-15 - Freohrskulblaka
 

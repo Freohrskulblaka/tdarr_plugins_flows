@@ -33,14 +33,6 @@ media_optimizer/
     pipeline/
     runtime/
     shared/
-    analysis.js
-    config.js
-    ffmpeg_command.js
-    formatting.js
-    logging.js
-    metadata_lookup.js
-    planning.js
-    response.js
 ```
 
 5. Restart the Tdarr node or refresh local plugins.
