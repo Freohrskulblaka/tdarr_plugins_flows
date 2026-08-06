@@ -39,20 +39,4 @@ media_optimizer/
 7. Start with `dryRun=true` and `logLevel=debug` for the first validation pass.
 8. Confirm the Tdarr log shows the expected runtime marker and planned track table before allowing live processing.
 
-## Local Validation
-
-From the wrapper project root, run:
-
-```powershell
-node context\tools\run_media_optimizer_plan_assertions.js
-node context\tools\run_media_optimizer_command_assertions.js
-node context\tools\run_media_optimizer_lookup_fixtures.js
-```
-
-For live Sonarr/Radarr lookup validation, place local credentials in the wrapper project's ignored `local\secrets\tdarr_plugins_flows.env` file and run:
-
-```powershell
-node context\tools\run_media_optimizer_live_lookup.js
-```
-
 Do not commit real hosts, API keys, runtime exports, logs, or media samples.

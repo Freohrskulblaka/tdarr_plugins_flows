@@ -44,13 +44,4 @@ media_optimizer/
 7. Add `Media Parts Extractor` to a staging or donor library flow.
 8. Start with `runMode=Dry Run` and a configured output directory before using `runMode=Extract`.
 
-## Local Validation
-
-From the wrapper project root, run:
-
-```powershell
-node context\tools\run_media_parts_extractor_assertions.js
-```
-
 Do not commit real hosts, API keys, runtime exports, logs, media samples, or extracted sidecars.
-

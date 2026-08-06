@@ -17,7 +17,7 @@ Tdarr classic plugins and support modules maintained by Freohrskulblaka.
 
 This repository does not commit Tdarr runtime helpers, real Arr credentials, exports, media samples, or local test output.
 
-For local harness work, the wrapper project may provide ignored runtime files such as `methods/` and a local credential file, but deployment payloads should include only the relevant classic plugin package and required support module folders.
+Deployment payloads should include only the relevant classic plugin package and required support module folders.
 
 Use `.env.example` as the placeholder shape for local lookup settings. Do not commit real hosts or API keys.
 
