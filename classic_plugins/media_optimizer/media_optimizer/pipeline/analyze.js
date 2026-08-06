@@ -13,14 +13,14 @@
  * - 2026-08-04 - Freohrskulblaka: Passed file context into chapter analysis for direct chapter probing.
  */
 
-const { analyzeAttachmentStreams } = require('./attachment');
-const { analyzeVideoStreams } = require('./video');
-const { analyzeAudioStreams } = require('./audio');
-const { analyzeChapters } = require('./chapter');
-const { analyzeFileInfo } = require('./file');
-const { analyzeMediaInfo } = require('./media_info');
-const { analyzeMetadata } = require('./metadata');
-const { analyzeExternalSubtitleFiles, analyzeSubtitleStreams } = require('./subtitle');
+const { analyzeAttachmentStreams } = require('../domains/attachments/analyze');
+const { analyzeVideoStreams } = require('../domains/video/analyze');
+const { analyzeAudioStreams } = require('../domains/audio/analyze');
+const { analyzeChapters } = require('../domains/chapters/analyze');
+const { analyzeFileInfo } = require('../domains/file/analyze');
+const { analyzeMediaInfo } = require('../domains/media_info/analyze');
+const { analyzeMetadata } = require('../domains/metadata/analyze');
+const { analyzeExternalSubtitleFiles, analyzeSubtitleStreams } = require('../domains/subtitles/analyze');
 
 function analyzeFile(context) {
   const streams = context.file?.ffProbeData?.streams || [];

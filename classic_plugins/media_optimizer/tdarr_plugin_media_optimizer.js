@@ -7,14 +7,14 @@
  */
 
 const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-arr-profile-2026-08-05-38';
-const { loadInputs, prepareConfig, createContext } = require('./media_optimizer/config');
-const { analyzeFile, summarizeAnalysis } = require('./media_optimizer/analysis');
-const { resolveOriginalLanguage } = require('./media_optimizer/metadata_lookup');
-const { buildProcessingPlan } = require('./media_optimizer/planning');
-const { renderFinalTrackTable, renderPlanSummary } = require('./media_optimizer/formatting');
-const { buildFfmpegCommand, renderFfmpegCommandPreview } = require('./media_optimizer/ffmpeg_command');
-const { runInPlaceActions } = require('./media_optimizer/actions/in_place');
-const { createResponse } = require('./media_optimizer/response');
+const { loadInputs, prepareConfig, createContext } = require('./media_optimizer/runtime/config');
+const { createResponse } = require('./media_optimizer/runtime/response');
+const { runInPlaceActions } = require('./media_optimizer/runtime/actions/in_place');
+const { resolveOriginalLanguage } = require('./media_optimizer/integrations/arr_original_language');
+const { analyzeFile, summarizeAnalysis } = require('./media_optimizer/pipeline/analyze');
+const { buildProcessingPlan } = require('./media_optimizer/pipeline/plan');
+const { buildFfmpegCommand, renderFfmpegCommandPreview } = require('./media_optimizer/pipeline/command');
+const { renderFinalTrackTable, renderPlanSummary } = require('./media_optimizer/pipeline/format');
 
 // #region Plugin Metadata
 function details() {

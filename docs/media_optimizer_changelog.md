@@ -256,6 +256,17 @@ modules under `../classic_plugins/media_optimizer/media_optimizer/` are cleared 
 makes iterative testing through Tdarr more predictable after the node or server
 reloads plugin files.
 
+## 2026-08-06 - Freohrskulblaka
+
+### Reorganized the support library by runtime, pipeline, domain, and integration
+
+Moved the Media Optimizer support modules into a more cohesive layout under
+`runtime/`, `pipeline/`, `domains/`, `integrations/`, and `shared/`.
+
+The classic plugin entrypoint now imports the new structure directly. Small
+compatibility modules remain at the library root for existing local harnesses
+and sibling plugin reuse.
+
 ## 2026-07-15 - Freohrskulblaka
 
 ### Added dry-run FFmpeg command preview wiring

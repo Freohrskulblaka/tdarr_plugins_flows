@@ -14,12 +14,12 @@
  * - 2026-08-04 - Freohrskulblaka: Suppressed genpts-only original-file remux loops.
  */
 
-const { planAttachments } = require('./attachment');
-const { planVideo } = require('./video');
-const { planAudio } = require('./audio');
-const { planChapters } = require('./chapter');
-const { planMetadata } = require('./metadata');
-const { planSubtitles } = require('./subtitle');
+const { planAttachments } = require('../domains/attachments/plan');
+const { planVideo } = require('../domains/video/plan');
+const { planAudio } = require('../domains/audio/plan');
+const { planChapters } = require('../domains/chapters/plan');
+const { planMetadata } = require('../domains/metadata/plan');
+const { planSubtitles } = require('../domains/subtitles/plan');
 
 function buildProcessingPlan(context) {
   const validation = validateRequiredStreams(context);

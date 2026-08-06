@@ -5,12 +5,12 @@
  * Description: Assembles focused command renderers into a dry-run-safe Tdarr FFmpeg preset preview.
  */
 
-const { addAttachmentArgs } = require('./attachments');
-const { addAudioArgs } = require('./audio');
-const { addChapterArgs, addGeneratedChapterInput } = require('./chapters');
-const { addMetadataArgs } = require('./metadata');
-const { addExternalSubtitleInputs, addSubtitleArgs } = require('./subtitles');
-const { addVideoArgs } = require('./video');
+const { addAttachmentArgs } = require('../domains/attachments/command');
+const { addAudioArgs } = require('../domains/audio/command');
+const { addChapterArgs, addGeneratedChapterInput } = require('../domains/chapters/command');
+const { addMetadataArgs } = require('../domains/metadata/command');
+const { addExternalSubtitleInputs, addSubtitleArgs } = require('../domains/subtitles/command');
+const { addVideoArgs } = require('../domains/video/command');
 
 function buildFfmpegCommand(context) {
   const plan = context.plan || {};

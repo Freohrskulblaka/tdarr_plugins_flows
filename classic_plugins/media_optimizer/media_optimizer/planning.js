@@ -1,1 +1,1 @@
-module.exports = require('./planning/index');
+module.exports = require('./pipeline/plan');

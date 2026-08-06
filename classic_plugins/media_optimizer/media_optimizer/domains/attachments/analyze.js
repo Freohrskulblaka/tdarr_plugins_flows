@@ -10,7 +10,7 @@
  * - 2026-07-15 - Freohrskulblaka: Normalized attachment filenames, MIME types, extensions, and type classification.
  */
 
-const { getUniqueValues } = require('./utils');
+const { getUniqueValues } = require('../../shared/analysis_utils');
 
 const FONT_EXTENSIONS = ['.ttf', '.otf', '.ttc', '.woff', '.woff2'];
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];

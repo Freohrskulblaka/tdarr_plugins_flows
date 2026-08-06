@@ -13,7 +13,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const { quoteArg } = require('./args');
+const { quoteArg } = require('../../shared/command_args');
 
 function addGeneratedChapterInput(context, chapterPlan, inputArgs, inputIndex) {
   if (chapterPlan?.action !== 'add') {

@@ -9,7 +9,7 @@
  * - 2026-08-05 - Freohrskulblaka: Render planned forced subtitle dispositions instead of clearing all forced flags.
  */
 
-const { addDisposition, addStreamMetadata, quoteArg } = require('./args');
+const { addDisposition, addStreamMetadata, quoteArg } = require('../../shared/command_args');
 
 function addExternalSubtitleInputs(subtitlePlan, inputArgs, startingInputIndex) {
   const externalSubtitleInputs = new Map();

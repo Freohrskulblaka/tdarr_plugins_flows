@@ -13,4 +13,4 @@
  * - 2026-07-21 - Freohrskulblaka: Split command rendering into focused modules under media_optimizer/command.
  */
 
-module.exports = require('./command');
+module.exports = require('./pipeline/command');

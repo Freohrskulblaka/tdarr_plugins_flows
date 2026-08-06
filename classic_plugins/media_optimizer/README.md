@@ -5,7 +5,7 @@ Deployable Tdarr classic plugin package for Media Optimizer.
 ## Contents
 
 - `tdarr_plugin_media_optimizer.js`: classic plugin entrypoint loaded by Tdarr.
-- `media_optimizer/`: support modules for configuration, analysis, planning, FFmpeg command rendering, metadata lookup, formatting, logging, and in-place no-op actions.
+- `media_optimizer/`: support modules grouped by runtime concerns, pipeline orchestration, media domains, integrations, and shared helpers.
 
 Keep these two items together. The plugin uses relative `require(...)` calls into the sibling `media_optimizer/` folder.
 
@@ -20,10 +20,18 @@ Keep these two items together. The plugin uses relative `require(...)` calls int
 media_optimizer/
   tdarr_plugin_media_optimizer.js
   media_optimizer/
-    actions/
-    analysis/
-    command/
-    planning/
+    domains/
+      attachments/
+      audio/
+      chapters/
+      file/
+      media_info/
+      metadata/
+      subtitles/
+      video/
+    integrations/
+    pipeline/
+    runtime/
     shared/
     analysis.js
     config.js

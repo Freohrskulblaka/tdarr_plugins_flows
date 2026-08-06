@@ -5,7 +5,7 @@
  * Description: Renders planned video tracks into FFmpeg output arguments.
  */
 
-const { addDisposition, addStreamMetadata, quoteArg } = require('./args');
+const { addDisposition, addStreamMetadata, quoteArg } = require('../../shared/command_args');
 
 function addVideoArgs(args, videoPlan, streamIndexes) {
   (videoPlan?.tracks || []).forEach((track) => {

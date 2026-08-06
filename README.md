@@ -9,7 +9,7 @@ Tdarr classic plugins and support modules maintained by Freohrskulblaka.
 
 ## Support Modules
 
-- `classic_plugins/media_optimizer/media_optimizer/`: Media Optimizer analysis, planning, command rendering, metadata lookup, formatting, logging, and in-place no-op actions.
+- `classic_plugins/media_optimizer/media_optimizer/`: Media Optimizer runtime, pipeline orchestration, domain modules, integrations, shared helpers, and compatibility entry points.
 - `classic_plugins/media_parts_extractor/media_parts_extractor/`: configuration, planning, naming, command rendering/execution, and formatting for Media Parts Extractor.
 - `docs/media_optimizer_changelog.md`: durable Media Optimizer change history and runtime validation markers.
 

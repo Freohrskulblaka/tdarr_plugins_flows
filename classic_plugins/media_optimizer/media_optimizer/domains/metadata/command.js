@@ -7,7 +7,7 @@
  * - 2026-08-04 - Freohrskulblaka: Strip global metadata without removing generated chapter titles.
  */
 
-const { findOutputIndex, quoteArg } = require('./args');
+const { findOutputIndex, quoteArg } = require('../../shared/command_args');
 
 function addMetadataArgs(args, plan, streamIndexes, warnings, unsupportedSteps) {
   const metadataPlan = plan.metadata || {};

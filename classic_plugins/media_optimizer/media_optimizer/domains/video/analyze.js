@@ -8,7 +8,7 @@
  * - 2026-07-13 - Freohrskulblaka: Reused shared analysis utility helpers.
  */
 
-const { getUniqueValues } = require('./utils');
+const { getUniqueValues } = require('../../shared/analysis_utils');
 
 const IMAGE_VIDEO_CODECS = ['mjpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/bmp', 'image/webp', 'image/tiff', 'image/x-ms-bmp'];
 

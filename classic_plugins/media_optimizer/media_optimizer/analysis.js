@@ -1,1 +1,1 @@
-module.exports = require('./analysis/index');
+module.exports = require('./pipeline/analyze');

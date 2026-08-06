@@ -13,7 +13,7 @@
 const {
   createLanguageLabel: createAudioLanguageLabel,
   normalizeLanguageForVariant: normalizeAudioLanguage,
-} = require('../shared/media_text');
+} = require('../../shared/media_text');
 
 const CHANNEL_RANK = {'7.1': 0, '5.1': 1, stereo: 2, other: 3};
 const CODEC_QUALITY_RANK = {truehd: 0, dts: 1, eac3: 2, ac3: 3, flac: 4, opus: 5, aac: 6, mp3: 7};
