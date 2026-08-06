@@ -10,6 +10,7 @@
  *   - Limited external SRT discovery to sidecars matching the current media filename.
  *   - Reused shared analysis utility helpers.
  * - 2026-07-15 - Freohrskulblaka: Counted external SRT cue rows for duplicate-import checks.
+ * - 2026-08-05 - Freohrskulblaka: Detect forced subtitle intent from title and sidecar filename text.
  */
 
 const fs = require('fs');
@@ -83,6 +84,7 @@ function enrichSubtitleStream(stream, mediaInfoSubtitleTrack) {
   const accessibility = detectSubtitleAccessibility(stream, title);
   const currentDefault = Boolean(stream.disposition?.default) || mediaInfoSubtitleTrack?.Default === 'Yes';
   const currentForced = Boolean(stream.disposition?.forced) || mediaInfoSubtitleTrack?.Forced === 'Yes';
+  const titleIndicatesForced = detectTitleForced(title);
   const commentary = analyzeSubtitleCommentary(stream, title);
   const subtitleAnalysis = {
     title,
@@ -101,6 +103,7 @@ function enrichSubtitleStream(stream, mediaInfoSubtitleTrack) {
     accessibility,
     currentDefault,
     currentForced,
+    titleIndicatesForced,
     isCommentary: commentary.isCommentary,
     commentaryReasons: commentary.reasons,
   };
@@ -140,6 +143,7 @@ function createExternalSubtitleFile(filePath, mediaNameNoExtension, sourceOrder)
     isEmpty,
     contentScope: isEmpty ? 'empty' : 'unknown',
     accessibility: detectTitleAccessibility(title),
+    titleIndicatesForced: detectTitleForced(title),
     isCommentary: false,
     commentaryReasons: [],
   };
@@ -236,6 +240,12 @@ function detectTitleAccessibility(title) {
   }
 
   return 'regular';
+}
+
+function detectTitleForced(title) {
+  const normalizedTitle = String(title || '').toLowerCase();
+
+  return /\bforced\b|\bforeign[ -]?only\b|\bsigns?[ &-]?songs?\b/.test(normalizedTitle);
 }
 
 function isEmptySubtitle({frameCount, elementCount, streamSize}) {

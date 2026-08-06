@@ -4,6 +4,7 @@
  * Created on: 2026-06-29
  * Description: Provides structured log collection and Tdarr infoLog formatting for the media optimizer workflow.
  * Updates:
+ * - 2026-08-05 - Freohrskulblaka: Added explicit summary entries so summary mode remains useful without normal info noise.
  * - 2026-06-29 - Freohrskulblaka: Created logging helpers with summary, normal, and debug log-level handling.
  */
 
@@ -49,6 +50,9 @@ function createLog(logLevel) {
     info(message, data) {
       addEntry('info', message, data);
     },
+    summary(message, data) {
+      addEntry('summary', message, data);
+    },
     warn(message, data) {
       addEntry('warn', message, data);
     },
@@ -78,19 +82,27 @@ function formatLogEntry(entry) {
   }
 
   if (typeof entry.data === 'undefined') {
-    formattedEntry = `[${entry.level}] ${entry.message}`;
+    formattedEntry = `[${getDisplayLevel(entry.level)}] ${entry.message}`;
     return formattedEntry;
   }
 
   if (typeof entry.data === 'string') {
-    formattedEntry = `[${entry.level}] ${entry.message}:\n${entry.data}`;
+    formattedEntry = `[${getDisplayLevel(entry.level)}] ${entry.message}:\n${entry.data}`;
     return formattedEntry;
   }
 
   const formattedData = formatLogData(entry.data);
-  formattedEntry = `[${entry.level}] ${entry.message}: ${formattedData}`;
+  formattedEntry = `[${getDisplayLevel(entry.level)}] ${entry.message}: ${formattedData}`;
 
   return formattedEntry;
+}
+
+function getDisplayLevel(level) {
+  if (level === 'summary') {
+    return 'info';
+  }
+
+  return level;
 }
 
 function formatLogData(data) {

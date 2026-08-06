@@ -3,6 +3,8 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-08-04
  * Description: Runs safe in-place maintenance actions for files that do not need an FFmpeg processing pass.
+ * Updates:
+ * - 2026-08-05 - Freohrskulblaka: Repair forced subtitle flags to the planned state during no-op passes.
  */
 
 function runInPlaceActions(context) {
@@ -57,7 +59,7 @@ function repairSubtitleDispositions(context) {
   const subtitleTracks = context.plan?.subtitles?.tracks || [];
   const dispositionUpdates = subtitleTracks
     .filter((track) => track.sourceKind === 'embedded')
-    .filter((track) => track.default !== track.currentDefault || track.currentForced);
+    .filter((track) => track.default !== track.currentDefault || track.forced !== track.currentForced);
   const shouldRepair = context.plan?.isValid
     && !context.plan?.shouldProcess
     && !context.settings.dryRun
@@ -84,7 +86,7 @@ function repairSubtitleDispositions(context) {
       '--set',
       `flag-default=${track.default ? '1' : '0'}`,
       '--set',
-      'flag-forced=0',
+      `flag-forced=${track.forced ? '1' : '0'}`,
     );
   });
 
@@ -102,7 +104,7 @@ function repairSubtitleDispositions(context) {
     context.log.info('Repaired subtitle default flags in place with mkvpropedit', dispositionUpdates.map((track) => ({
       subtitleIndex: track.sourceOrder,
       default: track.default,
-      forced: false,
+      forced: track.forced,
     })));
   } catch (error) {
     context.log.warn('Unable to repair subtitle default flags in place with mkvpropedit', {

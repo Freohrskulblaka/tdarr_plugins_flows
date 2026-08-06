@@ -6,6 +6,7 @@
  * Updates:
  * - 2026-08-04 - Freohrskulblaka: Leave kept embedded subtitles as stream copies; only annotate newly imported external subtitles.
  * - 2026-08-04 - Freohrskulblaka: Apply planned subtitle dispositions during active remuxes while preserving embedded subtitle metadata.
+ * - 2026-08-05 - Freohrskulblaka: Render planned forced subtitle dispositions instead of clearing all forced flags.
  */
 
 const { addDisposition, addStreamMetadata, quoteArg } = require('./args');
@@ -54,7 +55,7 @@ function addSubtitleArgs(args, subtitlePlan, streamIndexes, externalSubtitleInpu
     if (shouldApplyDispositions) {
       addDisposition(args, 's', outputIndex, {
         default: track.default,
-        forced: false,
+        forced: track.forced,
       });
     }
 

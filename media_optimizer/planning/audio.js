@@ -7,9 +7,11 @@
  * - 2026-06-30 - Freohrskulblaka: Created first-pass audio planning helper for language and channel profile decisions.
  * - 2026-07-07 - Freohrskulblaka: Refined audio planning around language order, commentary removal, 7.1 fallback generation, title normalization, and deterministic defaults.
  * - 2026-07-10 - Freohrskulblaka: Moved source audio classification into the audio analysis library.
+ * - 2026-08-05 - Freohrskulblaka: Retag undetermined-language audio to the resolved original or first configured language.
  */
 
 const {
+  createLanguageLabel: createAudioLanguageLabel,
   normalizeLanguageForVariant: normalizeAudioLanguage,
 } = require('../shared/media_text');
 
@@ -20,22 +22,26 @@ function planAudio(context) {
   const audioStreams = context.analysis.streams.audio.items;
   const languageOrder = createFinalAudioLanguageOrder(context);
   const candidateTracks = audioStreams.map((stream, sourceOrder) => createAudioTrack(stream, sourceOrder, context));
-  const eligibleSources = candidateTracks.filter((track) => isEligibleAudioSource(track, languageOrder, context));
-  const selectedTracks = selectFinalAudioTracks(eligibleSources, context, languageOrder);
-  const generatedTracks = createGeneratedAudioTracks(selectedTracks, eligibleSources, context, languageOrder);
-  const finalTracks = orderAudioTracks([...selectedTracks, ...generatedTracks], languageOrder);
+  const effectiveLanguageOrder = createEffectiveAudioLanguageOrder(candidateTracks, languageOrder, context);
+  const eligibleSources = candidateTracks.filter((track) => isEligibleAudioSource(track, effectiveLanguageOrder, context));
+  const selectedTracks = selectFinalAudioTracks(eligibleSources, context, effectiveLanguageOrder);
+  const generatedTracks = createGeneratedAudioTracks(selectedTracks, eligibleSources, context, effectiveLanguageOrder);
+  const finalTracks = orderAudioTracks([...selectedTracks, ...generatedTracks], effectiveLanguageOrder);
   const outputTracks = assignAudioOutputIndexes(finalTracks);
-  const removedTracks = createRemovedAudioTracks(candidateTracks, outputTracks, languageOrder, context);
+  const removedTracks = createRemovedAudioTracks(candidateTracks, outputTracks, effectiveLanguageOrder, context);
   const reasons = collectAudioReasons(outputTracks, removedTracks);
   const shouldProcess = shouldProcessAudio(candidateTracks, outputTracks, removedTracks, generatedTracks);
 
-  return {languageOrder, tracks: outputTracks, removedTracks, generatedTracks, reasons, shouldProcess};
+  return {languageOrder: effectiveLanguageOrder, configuredLanguageOrder: languageOrder, tracks: outputTracks, removedTracks, generatedTracks, reasons, shouldProcess};
 }
 
 function createFinalAudioLanguageOrder(context) {
   const originalLanguage = normalizeAudioLanguage(context.analysis.originalLanguage?.language || 'und');
   const configuredLanguages = context.settings.languageOrder.audio.map(normalizeAudioLanguage);
-  const desiredLanguages = new Set([originalLanguage, ...configuredLanguages]);
+  const desiredLanguages = new Set([
+    ...(originalLanguage && originalLanguage !== 'und' ? [originalLanguage] : []),
+    ...configuredLanguages,
+  ]);
   const languageOrder = Array.from(desiredLanguages);
 
   return languageOrder;
@@ -44,9 +50,10 @@ function createFinalAudioLanguageOrder(context) {
 function createAudioTrack(stream, sourceOrder, context) {
   const audioAnalysis = stream.analysis.audio;
   const title = audioAnalysis.title;
-  const language = audioAnalysis.language;
-  const languageVariant = audioAnalysis.languageVariant;
-  const languageLabel = audioAnalysis.languageLabel;
+  const currentLanguage = audioAnalysis.language;
+  const language = resolvePlannedAudioLanguage(currentLanguage, context);
+  const languageVariant = language === currentLanguage ? audioAnalysis.languageVariant : '';
+  const languageLabel = createAudioLanguageLabel(language, languageVariant);
   const channels = audioAnalysis.channels;
   const channelFamily = audioAnalysis.channelFamily;
   const codec = audioAnalysis.codec;
@@ -64,6 +71,9 @@ function createAudioTrack(stream, sourceOrder, context) {
     language,
     languageVariant,
     languageLabel,
+    currentLanguage,
+    currentLanguageLabel: audioAnalysis.languageLabel,
+    languageNeedsUpdate: language !== currentLanguage,
     channels,
     channelFamily,
     title,
@@ -79,6 +89,36 @@ function createAudioTrack(stream, sourceOrder, context) {
     bitrate: audioAnalysis.bitrate,
     reasons: [],
   };
+}
+
+function resolvePlannedAudioLanguage(language, context) {
+  const normalizedLanguage = normalizeAudioLanguage(language || 'und');
+
+  if (normalizedLanguage !== 'und') {
+    return normalizedLanguage;
+  }
+
+  const originalLanguage = normalizeAudioLanguage(context.analysis.originalLanguage?.language || '');
+
+  if (originalLanguage && originalLanguage !== 'und') {
+    return originalLanguage;
+  }
+
+  return normalizeAudioLanguage(context.settings.languageOrder.audio[0] || 'und');
+}
+
+function createEffectiveAudioLanguageOrder(candidateTracks, languageOrder, context) {
+  const nonCommentaryTracks = candidateTracks.filter((track) => {
+    return !(context.settings.audio.removeCommentary && track.isCommentary);
+  });
+  const hasTargetLanguageAudio = nonCommentaryTracks.some((track) => languageOrder.includes(track.language));
+  const hasUndeterminedAudio = nonCommentaryTracks.some((track) => track.language === 'und');
+
+  if (!hasTargetLanguageAudio && hasUndeterminedAudio && !languageOrder.includes('und')) {
+    return [...languageOrder, 'und'];
+  }
+
+  return languageOrder;
 }
 
 function isEligibleAudioSource(track, languageOrder, context) {
@@ -284,6 +324,10 @@ function createFinalTrackReasons(track, outputIndex) {
     reasons.push(`Audio title will be standardized to "${track.desiredTitle}".`);
   }
 
+  if (!track.generated && track.languageNeedsUpdate) {
+    reasons.push(`Audio language will be set to ${track.language}.`);
+  }
+
   if (track.action === 'convert') {
     reasons.push(`Audio codec ${track.codec} will be converted to ${track.targetCodec}.`);
   }
@@ -326,7 +370,7 @@ function shouldProcessAudio(candidateTracks, outputTracks, removedTracks, genera
   const hasGeneratedTracks = generatedTracks.length > 0;
   const hasTrackOrderChanges = outputTracks.some((track, index) => track.sourceOrder !== index);
   const hasTrackUpdates = outputTracks.some((track) => {
-    return track.generated || track.titleNeedsUpdate || track.action === 'convert' || track.default !== track.currentDefault;
+    return track.generated || track.titleNeedsUpdate || track.languageNeedsUpdate || track.action === 'convert' || track.default !== track.currentDefault;
   });
   const hasDefaultCleanup = candidateTracks.some((track) => {
     const outputTrack = outputTracks.find((candidate) => createTrackKey(candidate) === createTrackKey(track));

@@ -17,6 +17,7 @@
  * - 2026-07-15 - Freohrskulblaka: Skipped external SRT imports when an equivalent embedded text subtitle already exists.
  * - 2026-08-04 - Freohrskulblaka: Avoid reprocessing files only to retitle embedded subtitles or change subtitle dispositions.
  * - 2026-08-04 - Freohrskulblaka: Tracked already-embedded external SRT sidecars so no-op reruns can clean them up.
+ * - 2026-08-05 - Freohrskulblaka: Preserve forced subtitle intent from stream flags or forced-title evidence.
  */
 
 const {
@@ -89,6 +90,7 @@ function createSubtitleTrack(stream, sourceOrder, preserveExistingTitles) {
   const title = subtitleAnalysis.title;
   const codec = subtitleAnalysis.codec;
   const isCommentary = subtitleAnalysis.isCommentary;
+  const desiredForced = subtitleAnalysis.currentForced || subtitleAnalysis.titleIndicatesForced;
   const desiredTitle = createSubtitleTitle({
     title,
     language: subtitleAnalysis.language,
@@ -97,7 +99,7 @@ function createSubtitleTrack(stream, sourceOrder, preserveExistingTitles) {
     formatLabel: subtitleAnalysis.formatLabel,
     accessibility: subtitleAnalysis.accessibility,
     contentScope: subtitleAnalysis.contentScope,
-    currentForced: subtitleAnalysis.currentForced,
+    forced: desiredForced,
   }, preserveExistingTitles);
   const track = {
     sourceKind: 'embedded',
@@ -116,9 +118,10 @@ function createSubtitleTrack(stream, sourceOrder, preserveExistingTitles) {
     titleNeedsUpdate: title !== desiredTitle,
     action: 'copy',
     default: false,
-    forced: false,
+    forced: desiredForced,
     currentDefault: subtitleAnalysis.currentDefault,
     currentForced: subtitleAnalysis.currentForced,
+    titleIndicatesForced: subtitleAnalysis.titleIndicatesForced,
     isCommentary,
     isEmpty: subtitleAnalysis.isEmpty,
     contentScope: subtitleAnalysis.contentScope,
@@ -160,9 +163,10 @@ function createExternalSubtitleTrack(externalSubtitle, sourceOrder, preserveExis
     titleNeedsUpdate: externalSubtitle.title !== desiredTitle,
     action: 'import',
     default: false,
-    forced: false,
+    forced: externalSubtitle.titleIndicatesForced,
     currentDefault: false,
     currentForced: false,
+    titleIndicatesForced: externalSubtitle.titleIndicatesForced,
     isCommentary: externalSubtitle.isCommentary,
     isEmpty: externalSubtitle.isEmpty,
     contentScope: externalSubtitle.contentScope,
@@ -250,7 +254,7 @@ function assignSubtitleOutputIndexes(tracks) {
     outputIndex: index,
     title: track.desiredTitle,
     default: index === 0,
-    forced: false,
+    forced: track.forced,
     reasons: createFinalSubtitleReasons(track, index),
   }));
 
@@ -274,8 +278,10 @@ function createFinalSubtitleReasons(track, outputIndex) {
     reasons.push('Subtitle default flag will be disabled.');
   }
 
-  if (track.currentForced) {
-    reasons.push('Subtitle forced flag will be disabled until a forced-subtitle policy is defined.');
+  if (track.forced && !track.currentForced) {
+    reasons.push('Subtitle forced flag will be enabled.');
+  } else if (!track.forced && track.currentForced) {
+    reasons.push('Subtitle forced flag will be disabled.');
   }
 
   return reasons;
@@ -489,7 +495,7 @@ function createSubtitleTitle(track, preserveExistingTitle) {
     titleParts.push(accessibility);
   }
 
-  if (track.currentForced) {
+  if (track.forced) {
     titleParts.push('Forced');
   } else if (track.contentScope === 'sparse') {
     titleParts.push('Partial');
