@@ -6,10 +6,36 @@
  */
 
 const path = require('path');
-const { createLog } = require('../classic_plugins/media_optimizer/media_optimizer/logging');
+const { createLog } = require('../../media_optimizer/media_optimizer/logging');
+
+function loadTdarrMethodsLib() {
+  const candidatePaths = [
+    '../methods/lib',
+    '../../methods/lib',
+    '../../../methods/lib',
+  ];
+
+  const errors = [];
+
+  for (const candidatePath of candidatePaths) {
+    try {
+      const resolvedPath = require.resolve(candidatePath);
+      return require(resolvedPath)();
+    } catch (error) {
+      if (error && error.code === 'MODULE_NOT_FOUND') {
+        errors.push(`${candidatePath}: ${error.message}`);
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error(`Unable to load Tdarr methods/lib from Media Parts Extractor package. Tried: ${errors.join(' | ')}`);
+}
 
 function loadInputs(inputs, details) {
-  const lib = require('../methods/lib')();
+  const lib = loadTdarrMethodsLib();
   return lib.loadDefaultValues(Object.assign({}, inputs || {}), details);
 }
 

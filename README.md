@@ -5,12 +5,12 @@ Tdarr classic plugins and support modules maintained by Freohrskulblaka.
 ## Plugins
 
 - `classic_plugins/media_optimizer/`: deployable Media Optimizer classic plugin package. It contains the Tdarr entrypoint, support modules, and deployment README.
-- `classic_plugins/tdarr_plugin_media_parts_extractor.js`: donor audio/subtitle sidecar extractor for staging-library workflows. It plans or runs direct FFmpeg stream-copy extraction and does not rewrite the source media file.
+- `classic_plugins/media_parts_extractor/`: deployable Media Parts Extractor classic plugin package. It contains the Tdarr entrypoint, support modules, and deployment README.
 
 ## Support Modules
 
 - `classic_plugins/media_optimizer/media_optimizer/`: Media Optimizer analysis, planning, command rendering, metadata lookup, formatting, logging, and in-place no-op actions.
-- `media_parts_extractor/`: configuration, planning, naming, command rendering/execution, and formatting for Media Parts Extractor.
+- `classic_plugins/media_parts_extractor/media_parts_extractor/`: configuration, planning, naming, command rendering/execution, and formatting for Media Parts Extractor.
 - `docs/media_optimizer_changelog.md`: durable Media Optimizer change history and runtime validation markers.
 
 ## Local Runtime Files
@@ -31,9 +31,9 @@ See `classic_plugins/media_optimizer/README.md` for copy instructions and expect
 
 Deploy Media Parts Extractor with:
 
-- `classic_plugins/tdarr_plugin_media_parts_extractor.js`
-- the complete `media_parts_extractor/` folder
-- `classic_plugins/media_optimizer/media_optimizer/analysis/` and its compatibility entry point used by the extractor
+- `classic_plugins/media_parts_extractor/`
+
+See `classic_plugins/media_parts_extractor/README.md` for copy instructions and expected Tdarr layout.
 
 Inside Tdarr, copied folders should keep the same sibling layout documented in each plugin README so relative `require(...)` paths resolve.
 

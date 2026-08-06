@@ -5,15 +5,15 @@
  * Description: Tdarr classic plugin entrypoint for extracting donor audio and subtitle streams into sidecar files.
  */
 
-const { analyzeFile, summarizeAnalysis } = require('./media_optimizer/media_optimizer/analysis');
-const { loadInputs, prepareConfig, createContext } = require('../media_parts_extractor/config');
-const { buildExtractionPlan } = require('../media_parts_extractor/planning');
-const { buildExtractionCommands, executeExtractionCommands } = require('../media_parts_extractor/command');
+const { analyzeFile, summarizeAnalysis } = require('../media_optimizer/media_optimizer/analysis');
+const { loadInputs, prepareConfig, createContext } = require('./media_parts_extractor/config');
+const { buildExtractionPlan } = require('./media_parts_extractor/planning');
+const { buildExtractionCommands, executeExtractionCommands } = require('./media_parts_extractor/command');
 const {
   renderCommandPreview,
   renderExecutionResults,
   renderExtractionPlan,
-} = require('../media_parts_extractor/formatting');
+} = require('./media_parts_extractor/formatting');
 
 function details() {
   return {
