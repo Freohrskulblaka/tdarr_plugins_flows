@@ -6,7 +6,7 @@
  */
 
 const path = require('path');
-const { createLog } = require('../media_optimizer/logging');
+const { createLog } = require('../classic_plugins/media_optimizer/media_optimizer/logging');
 
 function loadInputs(inputs, details) {
   const lib = require('../methods/lib')();

@@ -1,0 +1,58 @@
+# Media Optimizer Classic Plugin
+
+Deployable Tdarr classic plugin package for Media Optimizer.
+
+## Contents
+
+- `tdarr_plugin_media_optimizer.js`: classic plugin entrypoint loaded by Tdarr.
+- `media_optimizer/`: support modules for configuration, analysis, planning, FFmpeg command rendering, metadata lookup, formatting, logging, and in-place no-op actions.
+
+Keep these two items together. The plugin uses relative `require(...)` calls into the sibling `media_optimizer/` folder.
+
+## Deploy To Tdarr
+
+1. Stop the Tdarr node or pause the library that uses this plugin.
+2. Open the local classic plugin directory configured for the Tdarr node that will run the plugin.
+3. Create or replace a `media_optimizer/` folder in that local classic plugin directory.
+4. Copy this package into that folder so the deployed layout is:
+
+```text
+media_optimizer/
+  tdarr_plugin_media_optimizer.js
+  media_optimizer/
+    actions/
+    analysis/
+    command/
+    planning/
+    shared/
+    analysis.js
+    config.js
+    ffmpeg_command.js
+    formatting.js
+    logging.js
+    metadata_lookup.js
+    planning.js
+```
+
+5. Restart the Tdarr node or refresh local plugins.
+6. Add `Media Optimizer` to the target library flow in Tdarr.
+7. Start with `dryRun=true` and `logLevel=debug` for the first validation pass.
+8. Confirm the Tdarr log shows the expected runtime marker and planned track table before allowing live processing.
+
+## Local Validation
+
+From the wrapper project root, run:
+
+```powershell
+node context\tools\run_media_optimizer_plan_assertions.js
+node context\tools\run_media_optimizer_command_assertions.js
+node context\tools\run_media_optimizer_lookup_fixtures.js
+```
+
+For live Sonarr/Radarr lookup validation, place local credentials in the wrapper project's ignored `local\secrets\tdarr_plugins_flows.env` file and run:
+
+```powershell
+node context\tools\run_media_optimizer_live_lookup.js
+```
+
+Do not commit real hosts, API keys, runtime exports, logs, or media samples.

@@ -1,6 +1,6 @@
 # Media Optimizer Changelog
 
-History of `../classic_plugins/tdarr_plugin_media_optimizer.js` and the supporting `../media_optimizer/` libraries used by the classic Tdarr Media Optimizer plugin.
+History of `../classic_plugins/media_optimizer/tdarr_plugin_media_optimizer.js` and the supporting `../classic_plugins/media_optimizer/media_optimizer/` libraries used by the classic Tdarr Media Optimizer plugin.
 
 ---
 
@@ -163,7 +163,7 @@ Runtime marker: `media-optimizer-arr-profile-2026-08-04-23`.
 
 ### Moved safe no-op actions out of the classic plugin entrypoint
 
-Moved in-place maintenance work into `../media_optimizer/actions/in_place.js` so the classic plugin entrypoint can stay focused on Tdarr input handling, analysis, planning, command rendering, and response construction.
+Moved in-place maintenance work into `../classic_plugins/media_optimizer/media_optimizer/actions/in_place.js` so the classic plugin entrypoint can stay focused on Tdarr input handling, analysis, planning, command rendering, and response construction.
 
 The first actions in this module remove matched external SRT sidecars that are already embedded in the MKV and repair subtitle default flags with `mkvpropedit` when a no-op file is already compliant except for bad subtitle
 dispositions. These actions intentionally keep the Tdarr response in no-process mode; they are maintenance fixes for files that do not need a new FFmpeg transcode/remux.
@@ -175,7 +175,7 @@ Runtime marker: `media-optimizer-arr-profile-2026-08-04-22`.
 ### Trimmed the classic plugin header, kept detailed history here
 
 Reduced the top-of-file comment in
-`../classic_plugins/tdarr_plugin_media_optimizer.js` to the stable plugin
+`../classic_plugins/media_optimizer/tdarr_plugin_media_optimizer.js` to the stable plugin
 description plus a pointer to this changelog. The detailed iteration history
 now lives here where it can grow without crowding the runtime entrypoint.
 
@@ -252,7 +252,7 @@ classic plugin helper path.
 ### Cleared support-module cache before local classic runs
 
 Expanded local classic-plugin reload behavior so the Media Optimizer support
-modules under `../media_optimizer/` are cleared before each local run. This
+modules under `../classic_plugins/media_optimizer/media_optimizer/` are cleared before each local run. This
 makes iterative testing through Tdarr more predictable after the node or server
 reloads plugin files.
 
@@ -272,8 +272,8 @@ chapter, attachment, and metadata operations before enabling live processing.
 ### Created the modular Media Optimizer classic plugin
 
 Created the Media Optimizer classic plugin entrypoint at
-`../classic_plugins/tdarr_plugin_media_optimizer.js` and split the work into
-supporting libraries under `../media_optimizer/`.
+`../classic_plugins/media_optimizer/tdarr_plugin_media_optimizer.js` and split the work into
+supporting libraries under `../classic_plugins/media_optimizer/media_optimizer/`.
 
 The initial modular shape separated analysis, planning, formatting, metadata
 lookup, and FFmpeg command rendering so each part of the optimization workflow

@@ -3,7 +3,7 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-06-29
  * Description: Tdarr classic plugin entrypoint that orchestrates media optimizer configuration, analysis, planning, and response logging.
- * Changelog: ../docs/media_optimizer_changelog.md
+ * Changelog: ../../docs/media_optimizer_changelog.md
  */
 
 const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-arr-profile-2026-08-05-38';
@@ -31,13 +31,13 @@ function loadOptimizerModules() {
   clearMediaOptimizerModuleCache();
 
   return {
-    config: requireFresh('../media_optimizer/config'),
-    analysis: requireFresh('../media_optimizer/analysis'),
-    metadataLookup: requireFresh('../media_optimizer/metadata_lookup'),
-    planning: requireFresh('../media_optimizer/planning'),
-    formatting: requireFresh('../media_optimizer/formatting'),
-    ffmpegCommand: requireFresh('../media_optimizer/ffmpeg_command'),
-    inPlaceActions: requireFresh('../media_optimizer/actions/in_place'),
+    config: requireFresh('./media_optimizer/config'),
+    analysis: requireFresh('./media_optimizer/analysis'),
+    metadataLookup: requireFresh('./media_optimizer/metadata_lookup'),
+    planning: requireFresh('./media_optimizer/planning'),
+    formatting: requireFresh('./media_optimizer/formatting'),
+    ffmpegCommand: requireFresh('./media_optimizer/ffmpeg_command'),
+    inPlaceActions: requireFresh('./media_optimizer/actions/in_place'),
   };
 }
 

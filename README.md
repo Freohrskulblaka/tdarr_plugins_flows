@@ -1,32 +1,42 @@
-# Tdarr Plugins & Flow Components
+# Tdarr Plugins And Flow Components
 
-## Overview
+Tdarr classic plugins and support modules maintained by Freohrskulblaka.
 
-The Tdarr Plugins & Flow Components repository provides a collection of plugins and components created by me. 
-These are made available to the community for anyone interested in following a similar process to optimize their media library. 
-I have consolidated various plugins and optimized them to achieve the desired structure for media files.
+## Plugins
 
-## Usage
+- `classic_plugins/media_optimizer/`: deployable Media Optimizer classic plugin package. It contains the Tdarr entrypoint, support modules, and deployment README.
+- `classic_plugins/tdarr_plugin_media_parts_extractor.js`: donor audio/subtitle sidecar extractor for staging-library workflows. It plans or runs direct FFmpeg stream-copy extraction and does not rewrite the source media file.
 
-To use the plugins and components, simply copy them into the appropriate server folder and configure inside of Tdarr.
+## Support Modules
 
-## Contributing
+- `classic_plugins/media_optimizer/media_optimizer/`: Media Optimizer analysis, planning, command rendering, metadata lookup, formatting, logging, and in-place no-op actions.
+- `media_parts_extractor/`: configuration, planning, naming, command rendering/execution, and formatting for Media Parts Extractor.
+- `docs/media_optimizer_changelog.md`: durable Media Optimizer change history and runtime validation markers.
 
-Contributions to this project are welcome. Feel free to submit bug reports, feature requests, or code contributions via Git.
+## Local Runtime Files
+
+This repository does not commit Tdarr runtime helpers, real Arr credentials, exports, media samples, or local test output.
+
+For local harness work, the wrapper project may provide ignored runtime files such as `methods/` and a local credential file, but deployment payloads should include only the relevant classic plugin package and required support module folders.
+
+Use `.env.example` as the placeholder shape for local lookup settings. Do not commit real hosts or API keys.
+
+## Deployment Notes
+
+Deploy Media Optimizer from:
+
+- `classic_plugins/media_optimizer/`
+
+See `classic_plugins/media_optimizer/README.md` for copy instructions and expected Tdarr layout.
+
+Deploy Media Parts Extractor with:
+
+- `classic_plugins/tdarr_plugin_media_parts_extractor.js`
+- the complete `media_parts_extractor/` folder
+- `classic_plugins/media_optimizer/media_optimizer/analysis/` and its compatibility entry point used by the extractor
+
+Inside Tdarr, copied folders should keep the same sibling layout documented in each plugin README so relative `require(...)` paths resolve.
 
 ## License
 
-This project is licensed under the GNU GENERAL PUBLIC LICENSE.
-
-## Contact
-
-For inquiries or contributions, please reach out via Git.
-
-## Acknowledgements
-
-Acknowledgements will be added in the future to credit various programmers who served as inspiration.
-
-## Additional Resources
-
-- [Tdarr Git Repository](https://github.com/HaveAGitGat/Tdarr)
-- [Tdarr Official Plugins Repository](https://github.com/HaveAGitGat/Tdarr_Plugins)
+This project is licensed under the GNU General Public License. See `LICENSE`.
