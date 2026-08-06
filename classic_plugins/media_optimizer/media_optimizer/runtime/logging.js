@@ -11,22 +11,23 @@
 function createLog(logLevel) {
   const entries = [];
   const resolvedLogLevel = logLevel || 'normal';
+  const validLogLevels = ['summary', 'normal', 'debug'];
+  const validEntryLevels = ['section', 'info', 'summary', 'warn', 'error', 'debug'];
+
+  if (!validLogLevels.includes(resolvedLogLevel)) {
+    throw new Error(`Invalid log level: ${resolvedLogLevel}`);
+  }
 
   const shouldLog = (level) => {
-    const isDebugEntry = level === 'debug';
-    const isInfoEntry = level === 'info';
-    const isSummaryMode = resolvedLogLevel === 'summary';
-    const isDebugMode = resolvedLogLevel === 'debug';
-
-    if (isDebugEntry) {
-      return isDebugMode;
+    if (!validEntryLevels.includes(level)) {
+      throw new Error(`Invalid log entry level: ${level}`);
     }
 
-    if (isSummaryMode && isInfoEntry) {
-      return false;
-    }
+    const shouldLogSummary = resolvedLogLevel === 'summary' && level !== 'info' && level !== 'debug';
+    const shouldLogNormal = resolvedLogLevel === 'normal' && level !== 'debug';
+    const shouldLogDebug = resolvedLogLevel === 'debug';
 
-    return true;
+    return shouldLogSummary || shouldLogNormal || shouldLogDebug;
   };
 
   const addEntry = (level, message, data) => {
@@ -34,87 +35,52 @@ function createLog(logLevel) {
       return;
     }
 
-    const entry = {
-      level,
-      message,
-      data,
-    };
+    const entry = {level, message, data};
 
     entries.push(entry);
   };
 
-  const log = {
-    section(title) {
-      addEntry('section', title);
-    },
-    info(message, data) {
-      addEntry('info', message, data);
-    },
-    summary(message, data) {
-      addEntry('summary', message, data);
-    },
-    warn(message, data) {
-      addEntry('warn', message, data);
-    },
-    error(message, data) {
-      addEntry('error', message, data);
-    },
-    debug(message, data) {
-      addEntry('debug', message, data);
-    },
+  const log = validEntryLevels.reduce((logger, level) => {
+    logger[level] = (message, data) => addEntry(level, message, data);
+    return logger;
+  }, {});
+
+  Object.assign(log, {
     toString() {
       const formattedEntries = entries.map(formatLogEntry);
       const output = formattedEntries.join('\n');
 
       return `${output}\n`;
     },
-  };
+  });
 
   return log;
 }
 
 function formatLogEntry(entry) {
-  let formattedEntry = '';
+  const displayLevel = entry.level === 'summary' ? 'info' : entry.level;
 
   if (entry.level === 'section') {
-    formattedEntry = `\n=== ${entry.message} ===`;
-    return formattedEntry;
+    return `\n=== ${entry.message} ===`;
   }
 
   if (typeof entry.data === 'undefined') {
-    formattedEntry = `[${getDisplayLevel(entry.level)}] ${entry.message}`;
-    return formattedEntry;
+    return `[${displayLevel}] ${entry.message}`;
   }
 
   if (typeof entry.data === 'string') {
-    formattedEntry = `[${getDisplayLevel(entry.level)}] ${entry.message}:\n${entry.data}`;
-    return formattedEntry;
+    return `[${displayLevel}] ${entry.message}:\n${entry.data}`;
   }
 
-  const formattedData = formatLogData(entry.data);
-  formattedEntry = `[${getDisplayLevel(entry.level)}] ${entry.message}: ${formattedData}`;
-
-  return formattedEntry;
-}
-
-function getDisplayLevel(level) {
-  if (level === 'summary') {
-    return 'info';
-  }
-
-  return level;
-}
-
-function formatLogData(data) {
   let formattedData = '';
 
   try {
-    formattedData = JSON.stringify(data);
+    formattedData = JSON.stringify(entry.data);
   } catch (error) {
     formattedData = `[Unable to format log data: ${error.message}]`;
   }
 
-  return formattedData;
+  return `[${displayLevel}] ${entry.message}: ${formattedData}`;
 }
 
 module.exports = {
