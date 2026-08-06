@@ -6,7 +6,7 @@
  * Changelog: ../docs/media_optimizer_changelog.md
  */
 
-const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-arr-profile-2026-08-05-24';
+const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-arr-profile-2026-08-05-38';
 
 function clearMediaOptimizerModuleCache() {
   const path = require('path');
@@ -49,7 +49,7 @@ function details() {
     Stage: 'Pre-processing',
     Type: 'Video, Audio, Subtitle',
     Operation: 'Transcode',
-    Description: 'Profile-driven media optimizer that plans video, audio, subtitle, attachment, chapter, and metadata cleanup in one dry-run-safe workflow. Sonarr/Radarr lookup uses the Arr connection profile input.',
+    Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, missing compatibility tracks, commentary removal, subtitle retention and external SRT import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through the Arr connection profile input. Already-compliant files return no-process with a compact summary instead of reprocessing.',
     Version: '0.1.0',
     Tags: 'pre-processing, ffmpeg, media optimizer, configurable',
     Inputs: [
@@ -71,7 +71,16 @@ function details() {
             'Copy Video',
           ],
         },
-        tooltip: 'Select the target video codec and encoder family. NVIDIA GPU is the initial supported path. CPU, Intel QSV, AMD AMF, and H.264 options are scaffolded for future support and currently marked disabled.',
+        tooltip: `
+          Select the target video codec and encoder family.\\n
+          H.265 / HEVC - NVIDIA GPU: supported production path. Transcodes video to HEVC using NVENC when the video plan says conversion is needed.\\n
+          H.265 / HEVC - CPU (Disabled): future CPU x265 path. Currently blocks processing with a clear disabled-profile warning.\\n
+          H.265 / HEVC - Intel GPU (Disabled): future Intel QSV path. Currently disabled.\\n
+          H.265 / HEVC - AMD GPU (Disabled): future AMD AMF path. Currently disabled.\\n
+          H.264 options (Disabled): scaffolded future H.264 output paths. Currently disabled.\\n
+          Copy Video: never transcodes video. Use this when testing audio, subtitle, chapter, or metadata behavior without changing video.\\n
+          Example: use H.265 / HEVC - NVIDIA GPU for normal library rollout; use Copy Video for remux-only validation.
+        `,
       },
       {
         name: 'videoQualityProfile',
@@ -89,7 +98,17 @@ function details() {
             'Copy When Compatible',
           ],
         },
-        tooltip: 'Balanced 1080p uses NVIDIA HEVC, slow preset, main10, 10-bit, and target compression rate 0.101. Archive Quality raises the target bitrate. Smaller Files lowers it. Compress 4K Preserve HDR Signaling keeps 4K resolution and writes basic HDR signaling flags when transcoding. Full HDR10+/Dolby Vision metadata cloning is not implemented yet. HDR-to-SDR and skip-HDR modes are scaffolded for future support and currently marked disabled.',
+        tooltip: `
+          Select the video quality and resolution policy.\\n
+          Balanced 1080p: default library profile. Uses HEVC main10, 10-bit, slow preset, and a balanced target size for 1080p output.\\n
+          Archive Quality: keeps a higher target bitrate for files where quality matters more than size.\\n
+          Smaller Files: lowers the target bitrate for more aggressive space savings.\\n
+          Compress 4K Preserve HDR Signaling: keeps 4K resolution and writes basic HDR signaling flags when transcoding.\\n
+          Compress 4K to SDR Experimental (Disabled): reserved for future HDR-to-SDR work. Currently disabled.\\n
+          Skip HDR Transcode (Disabled): reserved for future HDR skip logic. Currently disabled.\\n
+          Copy When Compatible: keeps compatible video when the selected codec/profile already matches.\\n
+          Example: Balanced 1080p is the normal choice for mixed libraries; Archive Quality is better for high-value movies.
+        `,
       },
       {
         name: 'audioProfile',
@@ -99,7 +118,15 @@ function details() {
           type: 'dropdown',
           options: ['Keep 5.1 and Stereo', 'Keep 7.1, 5.1, and Stereo', 'Stereo Only', 'Preserve Audio'],
         },
-        tooltip: 'Select the audio channel policy. Keep 5.1 and Stereo creates missing compatibility tracks and removes 7.1 after fallbacks exist. Preserve Audio avoids conversion/downmixing but still allows cleanup planning.',
+        tooltip: `
+          Select the audio channel policy.\\n
+          Keep 5.1 and Stereo: normal movie/TV profile. Keeps or creates one 5.1 track and one stereo track for each target language when a usable source exists.\\n
+          Keep 7.1, 5.1, and Stereo: keeps 7.1 sources and still creates lower-channel compatibility tracks when needed.\\n
+          Stereo Only: keeps or creates stereo output where possible. Useful for small devices or simple playback stacks.\\n
+          Preserve Audio: avoids conversion/downmixing. Still allows language tagging, ordering, default cleanup, and commentary removal planning.\\n
+          Commentary tracks are removed when the audio profile enables commentary cleanup.\\n
+          Example: Keep 5.1 and Stereo can create AAC stereo from a 5.1/7.1 source; it does not create 5.1 from stereo-only audio.
+        `,
       },
       {
         name: 'subtitleProfile',
@@ -109,7 +136,16 @@ function details() {
           type: 'dropdown',
           options: ['Picture First + Text', 'Include Original Language', 'Text First', 'Text Only'],
         },
-        tooltip: 'Select the subtitle retention and ordering policy. Picture First + Text keeps preferred-language image subtitles first, then text subtitles, and imports matching external SRT files when available.',
+        tooltip: `
+          Select the subtitle retention and ordering policy.\\n
+          Picture First + Text: keeps preferred-language image subtitles first, then text subtitles. Good for PGS-heavy movie sources.\\n
+          Include Original Language: includes subtitles for the resolved original language in addition to configured subtitle languages.\\n
+          Text First: prefers text subtitles before image subtitles. Good when SRT/ASS tracks are preferred by your players.\\n
+          Text Only: removes image subtitles and keeps/imports text subtitles only.\\n
+          Matching external SRT sidecars are imported when available. On a later no-process pass, matched sidecars are deleted after an embedded SRT match is confirmed.\\n
+          Forced subtitle intent can be preserved from stream flags or titles such as forced, foreign-only, or signs/songs.\\n
+          Example: Picture First + Text with subtitleLanguages eng,spa keeps English/Spanish PGS first, then English/Spanish text tracks.
+        `,
       },
       {
         name: 'metadataProfile',
@@ -119,21 +155,41 @@ function details() {
           type: 'dropdown',
           options: ['Clean', 'Preserve'],
         },
-        tooltip: 'Clean strips global tags, extra tag tracks, removes non-font attachments, preserves font attachments, and keeps or creates chapters. Preserve keeps the available source metadata.',
+        tooltip: `
+          Select the metadata cleanup policy.\\n
+          Clean: strips global tags, removes file/video titles, removes extra tag tracks, preserves font attachments, removes non-font attachments, and keeps or creates chapters.\\n
+          Preserve: keeps the available source metadata, tags, titles, attachments, and chapter layout when possible.\\n
+          Chapter handling uses existing MediaInfo Menu/@type chapter data when present. If no chapters exist and Clean is selected, generated chapter markers can be added.\\n
+          Example: Clean removes noisy release tags and non-font attachments while preserving ASS/SSA font attachments needed for styled subtitles.
+        `,
       },
       {
         name: 'audioLanguages',
         type: 'string',
         defaultValue: 'eng,spa',
         inputUI: { type: 'text' },
-        tooltip: 'Comma-separated preferred audio languages after the original language. Example: eng,spa',
+        tooltip: `
+          Comma-separated preferred audio languages.\\n
+          Use ISO-639-2/B three-letter language codes.\\n
+          The resolved original language is considered first when original language lookup is enabled.\\n
+          Undetermined audio can be retagged to the resolved original language, or to the first configured language when no better source exists.\\n
+          Example: eng,spa keeps English and Spanish audio, with original language priority added by lookup.\\n
+          Example: spa,eng makes Spanish the first configured fallback for untagged stereo-only files.
+        `,
       },
       {
         name: 'subtitleLanguages',
         type: 'string',
         defaultValue: 'eng,spa',
         inputUI: { type: 'text' },
-        tooltip: 'Comma-separated subtitle language order. Example: eng,spa',
+        tooltip: `
+          Comma-separated preferred subtitle languages.\\n
+          Use ISO-639-2/B three-letter language codes.\\n
+          Subtitles are retained and ordered using this list plus the selected subtitle profile.\\n
+          Include Original Language adds the resolved original language to subtitle retention.\\n
+          Example: eng,spa keeps English and Spanish subtitle tracks and imports matching English/Spanish SRT sidecars.\\n
+          Example: eng keeps only English subtitles unless Include Original Language adds another language.
+        `,
       },
       {
         name: 'originalLanguageLookup',
@@ -143,14 +199,32 @@ function details() {
           type: 'dropdown',
           options: ['Disabled', 'Filename and Streams Only', 'Sonarr/Radarr Arr Profile'],
         },
-        tooltip: 'Select how original language should be resolved. Sonarr/Radarr Arr Profile uses the single arrConnectionProfile JSON input. Keys are not included in Media Optimizer logs.',
+        tooltip: `
+          Select how original language should be resolved.\\n
+          Disabled: skips Sonarr/Radarr and disables original-language lookup logic. Local stream language may still be used as a fallback label.\\n
+          Filename and Streams Only: avoids Sonarr/Radarr and uses filename IDs plus local stream metadata where possible.\\n
+          Sonarr/Radarr Arr Profile: uses the arrConnectionProfile JSON input to ask Sonarr/Radarr for original language metadata.\\n
+          Radarr is used for movie-style matches; Sonarr is used for TV-style matches.\\n
+          Tdarr may log plugin input values; keep Arr instances local or rotate keys after rollout.\\n
+          Example: use Sonarr/Radarr Arr Profile for normal production, Filename and Streams Only for offline testing.
+        `,
       },
       {
         name: 'arrConnectionProfile',
         type: 'string',
         defaultValue: '',
         inputUI: { type: 'text' },
-        tooltip: 'Optional JSON object for Sonarr/Radarr lookup. Example: {"sonarr":{"host":"10.0.0.10:8989","apiKey":"key"},"radarr":{"host":"10.0.0.10:7878","apiKey":"key"}}',
+        tooltip: `
+          Optional JSON object for Sonarr/Radarr original-language lookup.\\n
+          Include only the services you use.\\n
+          Hosts can include or omit http://.\\n
+          Do not deploy local .env harness files; this input is the Tdarr-side connection profile.\\n
+          The expected keys are sonarr.host, sonarr.apiKey, radarr.host, and radarr.apiKey.\\n
+          Example with both services:\\n
+          {"sonarr":{"host":"10.0.0.10:8989","apiKey":"key"},"radarr":{"host":"10.0.0.10:7878","apiKey":"key"}}\\n
+          Example with Radarr only:\\n
+          {"radarr":{"host":"10.0.0.10:7878","apiKey":"key"}}
+        `,
       },
       {
         name: 'dryRun',
@@ -160,7 +234,13 @@ function details() {
           type: 'dropdown',
           options: ['false', 'true'],
         },
-        tooltip: 'When true, log the analysis and final plan but do not process the file.',
+        tooltip: `
+          Controls whether Media Optimizer only plans or actually processes.\\n
+          true: dry run. Logs analysis, final track plan, and FFmpeg command preview without processing the file.\\n
+          false: process mode. Returns an FFmpeg preset only when the plan is valid, processing is needed, the command is executable, and dry run is false.\\n
+          Use dry run first when changing profiles or rolling the plugin out to a new library.\\n
+          Example: keep true for first-pass validation, then set false after the planned track table looks correct.
+        `,
       },
       {
         name: 'logLevel',
@@ -170,7 +250,14 @@ function details() {
           type: 'dropdown',
           options: ['summary', 'normal', 'debug'],
         },
-        tooltip: 'Controls log verbosity.',
+        tooltip: `
+          Controls Media Optimizer log verbosity.\\n
+          summary: compact compliance summary only. Best for stable no-process reruns.\\n
+          normal: standard rollout logging. Shows useful plan details without the full debug analysis on no-op runs.\\n
+          debug: full analysis, planning reasons, final track table, and command preview. Best for diagnosing why a file would or would not process.\\n
+          In dry run, normal and debug intentionally include the planned FFmpeg command preview.\\n
+          Example: use summary for broad rollout monitoring and debug for a single confusing file.
+        `,
       },
     ],
   };
@@ -222,7 +309,10 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
   context.plan.ffmpegArgs = context.plan.command.args;
   runInPlaceActions(context);
 
-  if (context.plan.shouldProcess || context.settings.dryRun) {
+  if (context.settings.logLevel === 'summary') {
+    context.log.section('Compliance summary');
+    context.log.summary(renderPlanSummary(context.plan, context.analysis));
+  } else if (context.plan.shouldProcess || context.settings.dryRun) {
     context.log.info('Analysis summary', summarizeAnalysis(context.analysis));
     context.log.section('Planned final track table');
     context.log.info(renderFinalTrackTable(context.plan));

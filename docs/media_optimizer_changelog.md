@@ -4,6 +4,138 @@ History of `../classic_plugins/tdarr_plugin_media_optimizer.js` and the supporti
 
 ---
 
+## 2026-08-05 - Freohrskulblaka
+
+### Escaped tooltip line breaks for Tdarr rendering
+
+Changed tooltip line break markers from single escaped newlines to double
+escaped `\\n` sequences in the JavaScript source so Tdarr receives the literal
+line break markers its tooltip renderer expects.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-38`.
+
+### Restored plugin description to a regular string
+
+Changed the classic plugin metadata description back to a regular quoted
+string after confirming Tdarr sanitizes multiline description formatting and
+handles wrapping on its own. Detailed multiline guidance remains in the input
+tooltips.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-37`.
+
+### Added option-by-option tooltip details
+
+Expanded every classic plugin input tooltip with Tdarr-friendly explicit
+newline escapes. Dropdown inputs now describe each option, and text/boolean
+inputs include examples and rollout cautions so the detailed guidance lives in
+the tooltip UI instead of the sanitized plugin description modal.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-36`.
+
+### Expanded input tooltips with multiline guidance
+
+Changed the classic plugin input tooltips from dense single-line strings to
+multiline template literals. The tooltip text now carries the detailed UI
+guidance for video, audio, subtitles, metadata, language order, Arr lookup,
+dry run, and log verbosity because Tdarr sanitizes the plugin-level
+description field.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-35`.
+
+### Matched Tdarr's padded multiline description style
+
+Changed the classic plugin metadata description to a single padded multiline
+template literal with blank lines between sentences. This matches the style
+used by Tdarr plugins that display longer descriptions and avoids array joins
+or generated separators.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-34`.
+
+### Reworked description source as a multiline template literal
+
+Changed the classic plugin metadata description from a sentence array to a
+single multiline template literal. This keeps the source exactly formatted as
+the desired Tdarr description text while validating whether Tdarr preserves
+literal multiline plugin metadata differently from constructed strings.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-33`.
+
+### Tried Unicode line separators for Tdarr descriptions
+
+Changed the classic plugin metadata description separator from HTML line breaks
+to Unicode line separators after the Tdarr description modal rendered `<br />`
+as literal escaped text. This keeps the description source sentence-per-line
+and tests whether Tdarr's plain text renderer honors explicit line separators.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-32`.
+
+### Rendered description sentence breaks in Tdarr
+
+Changed the classic plugin metadata description separator from newline
+characters to HTML line breaks because the Tdarr description modal collapses
+plain whitespace. The source still keeps each description sentence on its own
+line.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-31`.
+
+### Split the Tdarr plugin description into readable lines
+
+Changed the classic plugin metadata description so each sentence is maintained
+on its own line, making the Tdarr UI text and source metadata easier to scan.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-30`.
+
+### Expanded the Tdarr plugin description
+
+Updated the classic plugin metadata description to explain the validated
+workflow in the Tdarr UI: video copy/transcode planning, audio cleanup and
+compatibility track generation, subtitle and external SRT handling, attachment
+policy, chapter handling, metadata cleanup, Arr original-language lookup, and
+no-process behavior for already-compliant files.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-29`.
+
+### Made summary logging quiet but still useful
+
+Changed summary logging so it emits a compact compliance summary instead of
+empty dry-run section headers. Summary mode now avoids the analysis dump,
+planned final track table, and FFmpeg command preview while still reporting
+whether the file would process and what the plan would retain or change.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-28`.
+
+### Retagged undetermined audio to the best fallback language
+
+Changed audio planning to retag `und` audio to the resolved original language
+when one is available, or to the first configured audio language otherwise.
+The base audio language order also skips implicit `und` unless it is explicitly
+configured. This prevents a cache follow-up pass from dropping the only audio
+track after an MP4 or untagged file has already been converted to MKV while
+still producing clean language tags.
+
+This was found with `La Hipocondríaca Capítulo 116 (FIN).mp4`: the first pass
+converted the file and copied the AAC stereo audio, but a cache-output
+follow-up treated the `und` audio as outside the target `eng,spa` order and
+produced a video-only MKV.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-27`.
+
+### Preserved title-indicated forced subtitles
+
+Changed subtitle planning to treat titles and sidecar filenames containing
+forced-subtitle cues, such as `forced`, as desired forced subtitle tracks even
+when the source stream's forced disposition flag is missing. Active FFmpeg
+commands now render the planned forced disposition instead of clearing all
+forced flags, and no-op `mkvpropedit` repair can set forced flags to the
+planned state.
+
+This was found with `The Bank Job`, where the retained English subtitle was
+titled `English (forced)` but the source stream did not expose a forced flag.
+The previous command copied the track as a default subtitle while leaving
+`forced=0`.
+
+Runtime marker: `media-optimizer-arr-profile-2026-08-05-25`.
+
 ## 2026-08-04 - Freohrskulblaka
 
 ### Stabilized generated chapter metadata file placement
