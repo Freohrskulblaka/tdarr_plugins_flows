@@ -7,39 +7,14 @@
  */
 
 const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-arr-profile-2026-08-05-38';
-
-function clearMediaOptimizerModuleCache() {
-  const path = require('path');
-  const mediaOptimizerSegment = `${path.sep}media_optimizer${path.sep}`;
-
-  Object.keys(require.cache).forEach((cachedPath) => {
-    if (cachedPath.includes(mediaOptimizerSegment)) {
-      delete require.cache[cachedPath];
-    }
-  });
-}
-
-function requireFresh(modulePath) {
-  const resolvedPath = require.resolve(modulePath);
-
-  delete require.cache[resolvedPath];
-
-  return require(modulePath);
-}
-
-function loadOptimizerModules() {
-  clearMediaOptimizerModuleCache();
-
-  return {
-    config: requireFresh('./media_optimizer/config'),
-    analysis: requireFresh('./media_optimizer/analysis'),
-    metadataLookup: requireFresh('./media_optimizer/metadata_lookup'),
-    planning: requireFresh('./media_optimizer/planning'),
-    formatting: requireFresh('./media_optimizer/formatting'),
-    ffmpegCommand: requireFresh('./media_optimizer/ffmpeg_command'),
-    inPlaceActions: requireFresh('./media_optimizer/actions/in_place'),
-  };
-}
+const { loadInputs, prepareConfig, createContext } = require('./media_optimizer/config');
+const { analyzeFile, summarizeAnalysis } = require('./media_optimizer/analysis');
+const { resolveOriginalLanguage } = require('./media_optimizer/metadata_lookup');
+const { buildProcessingPlan } = require('./media_optimizer/planning');
+const { renderFinalTrackTable, renderPlanSummary } = require('./media_optimizer/formatting');
+const { buildFfmpegCommand, renderFfmpegCommandPreview } = require('./media_optimizer/ffmpeg_command');
+const { runInPlaceActions } = require('./media_optimizer/actions/in_place');
+const { createResponse } = require('./media_optimizer/response');
 
 // #region Plugin Metadata
 function details() {
@@ -266,15 +241,6 @@ function details() {
 
 // #region Plugin Entry Point
 async function plugin(file, librarySettings, inputs, otherArguments) {
-  const {
-    config: { loadInputs, prepareConfig, createContext },
-    analysis: { analyzeFile, summarizeAnalysis },
-    metadataLookup: { resolveOriginalLanguage },
-    planning: { buildProcessingPlan },
-    formatting: { renderFinalTrackTable, renderPlanSummary },
-    ffmpegCommand: { buildFfmpegCommand, renderFfmpegCommandPreview },
-    inPlaceActions: { runInPlaceActions },
-  } = loadOptimizerModules();
   const rawInputs = loadInputs(inputs, details);
   const config = prepareConfig(rawInputs);
   const context = createContext(file, librarySettings, config, otherArguments);
@@ -329,21 +295,6 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
   }
 
   return createResponse(context);
-}
-
-function createResponse(context) {
-  const command = context.plan?.command || null;
-  const canExecute = Boolean(context.plan?.isValid && context.plan?.shouldProcess && command?.isExecutable && !context.settings.dryRun);
-  const response = Object.assign({}, context.response, {
-    processFile: canExecute,
-    preset: canExecute ? command.preset : '',
-    FFmpegMode: canExecute,
-    ffmpegMode: canExecute,
-    cliToUse: canExecute ? 'ffmpeg' : '',
-    infoLog: context.log.toString(),
-  });
-
-  return response;
 }
 
 // #endregion

@@ -32,6 +32,7 @@ media_optimizer/
     logging.js
     metadata_lookup.js
     planning.js
+    response.js
 ```
 
 5. Restart the Tdarr node or refresh local plugins.
