@@ -9,7 +9,7 @@
 const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-arr-profile-2026-08-05-38';
 const { loadInputs, prepareConfig, createContext } = require('./media_optimizer/runtime/config');
 const { createResponse } = require('./media_optimizer/runtime/response');
-const { runInPlaceActions } = require('./media_optimizer/runtime/actions/in_place');
+const { runSubtitleActions } = require('./media_optimizer/domains/subtitles/actions');
 const { resolveOriginalLanguage } = require('./media_optimizer/integrations/arr_original_language');
 const { analyzeFile, summarizeAnalysis } = require('./media_optimizer/pipeline/analyze');
 const { buildProcessingPlan } = require('./media_optimizer/pipeline/plan');
@@ -273,7 +273,7 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
 
   context.plan.command = buildFfmpegCommand(context);
   context.plan.ffmpegArgs = context.plan.command.args;
-  runInPlaceActions(context);
+  runSubtitleActions(context);
 
   if (context.settings.logLevel === 'summary') {
     context.log.section('Compliance summary');
