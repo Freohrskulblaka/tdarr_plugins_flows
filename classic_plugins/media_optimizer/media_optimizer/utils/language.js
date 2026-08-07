@@ -1,18 +1,11 @@
 /*
- * Media Optimizer Text Analysis Library
+ * Media Optimizer Language Utility Library
  * Created by: Freohrskulblaka
  * Created on: 2026-07-10
- * Description: Shared text helpers for commentary detection, language variants, and normalized title matching.
+ * Description: Normalizes language values, detects language variants, and builds language labels.
  * Updates:
- * - 2026-07-10 - Freohrskulblaka: Added shared commentary detection and table-driven language variant rules.
+ * - 2026-07-10 - Freohrskulblaka: Added table-driven language variant rules.
  */
-
-const COMMENTARY_TITLE_PATTERNS = [
-  /commentary|commentator|director.?s? comment|audio comment/,
-  /descriptive|description|described video|narration|narrator/,
-  /comentarios?|comentarios? del director|comentarios? de director|audio comentario|audiocomentario/,
-  /audio descriptivo|audiodescripcion|descripcion de audio|narracion|narrador/,
-];
 
 const LANGUAGE_VARIANT_RULES = {
   eng: [
@@ -33,28 +26,6 @@ const LANGUAGE_VARIANT_RULES = {
     { variant: 'ES', codes: ['es-es', 'spa-es'], patterns: [/spa[-_ ]?es|es[-_ ]?es|espana|spain|castilian|castellano/] },
   ],
 };
-
-function analyzeCommentaryTrack({ disposition, title }) {
-  const normalizedTitle = normalizeVariantText(title);
-  const hasCommentaryDisposition = Boolean(disposition?.comment || disposition?.descriptions);
-  const matchedTitlePattern = COMMENTARY_TITLE_PATTERNS.find((pattern) => pattern.test(normalizedTitle));
-  const reasons = [];
-
-  if (hasCommentaryDisposition) {
-    reasons.push('commentary disposition flag');
-  }
-
-  if (matchedTitlePattern) {
-    reasons.push('commentary title keyword');
-  }
-
-  const commentary = {
-    isCommentary: reasons.length > 0,
-    reasons,
-  };
-
-  return commentary;
-}
 
 function detectLanguageVariant(language, languageCodes, titleValues) {
   const normalizedLanguage = normalizeLanguageForVariant(language);
@@ -113,7 +84,6 @@ function normalizeVariantText(value) {
 }
 
 module.exports = {
-  analyzeCommentaryTrack,
   createLanguageLabel,
   detectLanguageVariant,
   normalizeLanguageForVariant,

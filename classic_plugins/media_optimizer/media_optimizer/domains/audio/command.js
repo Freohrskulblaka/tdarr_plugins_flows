@@ -5,7 +5,7 @@
  * Description: Renders planned audio tracks, including generated derivatives, into FFmpeg output arguments.
  */
 
-const { addDisposition, addStreamMetadata, quoteArg } = require('../../shared/command_args');
+const { addDisposition, addStreamMetadata, quoteArg } = require('../../utils/command_args');
 
 function addAudioArgs(args, audioPlan, streamIndexes) {
   (audioPlan?.tracks || []).forEach((track) => {

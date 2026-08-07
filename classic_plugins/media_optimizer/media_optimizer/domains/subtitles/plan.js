@@ -23,7 +23,7 @@
 const {
   createLanguageLabel: createSubtitleLanguageLabel,
   normalizeLanguageForVariant: normalizeSubtitleLanguage,
-} = require('../../shared/media_text');
+} = require('../../utils/language');
 
 const SUBTITLE_LANGUAGE_TITLE_LABELS = {
   eng: 'English',

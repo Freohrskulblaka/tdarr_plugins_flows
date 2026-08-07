@@ -15,8 +15,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { getUniqueValues } = require('../../shared/analysis_utils');
-const { analyzeCommentaryTrack, createLanguageLabel, detectLanguageVariant, normalizeLanguageForVariant} = require('../../shared/media_text');
+const { getUniqueValues } = require('../../utils/analysis');
+const { createLanguageLabel, detectLanguageVariant, normalizeLanguageForVariant } = require('../../utils/language');
+const { analyzeCommentaryTrack } = require('../../utils/track_intent');
 
 const PICTURE_SUBTITLE_CODECS = ['hdmv_pgs_subtitle', 'dvd_subtitle'];
 const TEXT_SUBTITLE_CODECS = ['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'mov_text'];
