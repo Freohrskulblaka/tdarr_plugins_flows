@@ -42,11 +42,11 @@ const SUBTITLE_VARIANT_TITLE_LABELS = {
 };
 
 function planSubtitles(context) {
-  const subtitleStreams = context.analysis.streams.subtitle.items;
+  const embeddedSubtitles = context.analysis.streams.subtitle.items;
   const languageOrder = createFinalSubtitleLanguageOrder(context);
   const preserveExistingTitles = shouldPreserveExistingSubtitleTitles(context);
-  const embeddedTracks = subtitleStreams.map((stream, sourceOrder) => createSubtitleTrack(stream, sourceOrder, preserveExistingTitles));
-  const externalDiscovery = discoverExternalSrtImports(context, languageOrder, preserveExistingTitles);
+  const embeddedTracks = embeddedSubtitles.map((subtitle) => createSubtitleTrack(subtitle, preserveExistingTitles));
+  const externalDiscovery = discoverExternalSubtitleImports(context, languageOrder, preserveExistingTitles);
   const externalTracks = externalDiscovery.imports;
   const candidateTracks = [...embeddedTracks, ...externalTracks];
   const keptTracks = selectSubtitleTracks(candidateTracks, context, languageOrder);
@@ -85,27 +85,19 @@ function createFinalSubtitleLanguageOrder(context) {
   return languageOrder;
 }
 
-function createSubtitleTrack(stream, sourceOrder, preserveExistingTitles) {
-  const subtitleAnalysis = stream.analysis.subtitle;
+function createSubtitleTrack(subtitleAnalysis, preserveExistingTitles) {
   const title = subtitleAnalysis.title;
   const codec = subtitleAnalysis.codec;
   const isCommentary = subtitleAnalysis.isCommentary;
   const desiredForced = subtitleAnalysis.currentForced || subtitleAnalysis.titleIndicatesForced;
-  const desiredTitle = createSubtitleTitle({
-    title,
-    language: subtitleAnalysis.language,
-    languageVariant: subtitleAnalysis.languageVariant,
-    languageLabel: subtitleAnalysis.languageLabel,
-    formatLabel: subtitleAnalysis.formatLabel,
-    accessibility: subtitleAnalysis.accessibility,
-    contentScope: subtitleAnalysis.contentScope,
+  const desiredTitle = createSubtitleTitle(Object.assign({}, subtitleAnalysis, {
     forced: desiredForced,
-  }, preserveExistingTitles);
+  }), preserveExistingTitles);
   const track = {
     sourceKind: 'embedded',
-    sourceIndex: stream.index,
+    sourceIndex: subtitleAnalysis.sourceIndex,
     sourcePath: '',
-    sourceOrder,
+    sourceOrder: subtitleAnalysis.sourceOrder,
     outputIndex: null,
     codec,
     formatLabel: subtitleAnalysis.formatLabel,
@@ -154,6 +146,8 @@ function createExternalSubtitleTrack(externalSubtitle, sourceOrder, preserveExis
     outputIndex: null,
     codec: externalSubtitle.codec,
     formatLabel: externalSubtitle.formatLabel,
+    inputFormat: externalSubtitle.inputFormat,
+    textEncoding: externalSubtitle.textEncoding,
     language: externalSubtitle.language,
     languageVariant: externalSubtitle.languageVariant,
     languageLabel: externalSubtitle.languageLabel || createSubtitleLanguageLabel(externalSubtitle.language, externalSubtitle.languageVariant),
@@ -311,14 +305,17 @@ function createCommentaryRemovalReason(track) {
   return `Subtitle track appears to be commentary, descriptive, narration, or director commentary (${commentaryReasons.join(', ')}).`;
 }
 
-function discoverExternalSrtImports(context, languageOrder, preserveExistingTitles) {
+function discoverExternalSubtitleImports(context, languageOrder, preserveExistingTitles) {
   if (!context.settings.subtitle.importExternalSrt) {
-    return [];
+    return {
+      imports: [],
+      matchedExternalSubtitles: [],
+    };
   }
 
   const embeddedSubtitleTracks = context.analysis.streams.subtitle.items
-    .map((stream, sourceOrder) => createSubtitleTrack(stream, sourceOrder, preserveExistingTitles));
-  const discovery = (context.analysis.externalSubtitles || []).reduce((result, externalSubtitle) => {
+    .map((subtitle) => createSubtitleTrack(subtitle, preserveExistingTitles));
+  const discovery = (context.analysis.externalSubtitles?.items || []).reduce((result, externalSubtitle) => {
     if (!languageOrder.includes(externalSubtitle.language)) {
       return result;
     }
@@ -488,8 +485,13 @@ function createSubtitleTitle(track, preserveExistingTitle) {
     return existingTitle;
   }
 
-  const titleParts = [createSubtitleLanguageTitleLabel(track)];
+  const baseLanguage = SUBTITLE_LANGUAGE_TITLE_LABELS[track.language] || track.languageLabel || track.language || 'und';
+  const variantText = String(track.languageVariant || '');
+  const variant = variantText.includes('-') ? variantText.split('-').slice(1).join('-') : variantText;
+  const variantLabel = SUBTITLE_VARIANT_TITLE_LABELS[variant] || variant;
+  const languageTitle = [baseLanguage, variantLabel].filter(Boolean).join(' ');
   const accessibility = String(track.accessibility || '').trim();
+  const titleParts = [languageTitle];
 
   if (accessibility && accessibility !== 'regular') {
     titleParts.push(accessibility);
@@ -504,28 +506,6 @@ function createSubtitleTitle(track, preserveExistingTitle) {
   titleParts.push(track.formatLabel || track.codec || 'unknown');
 
   return titleParts.filter(Boolean).join(' - ');
-}
-
-function createSubtitleLanguageTitleLabel(track) {
-  const baseLabel = SUBTITLE_LANGUAGE_TITLE_LABELS[track.language] || track.languageLabel || track.language || 'und';
-  const variantLabel = createSubtitleVariantTitleLabel(track.languageVariant);
-
-  if (!variantLabel) {
-    return baseLabel;
-  }
-
-  return `${baseLabel} ${variantLabel}`;
-}
-
-function createSubtitleVariantTitleLabel(languageVariant) {
-  const variantText = String(languageVariant || '');
-  const variant = variantText.includes('-') ? variantText.split('-').slice(1).join('-') : variantText;
-
-  if (!variant) {
-    return '';
-  }
-
-  return SUBTITLE_VARIANT_TITLE_LABELS[variant] || variant;
 }
 
 module.exports = {

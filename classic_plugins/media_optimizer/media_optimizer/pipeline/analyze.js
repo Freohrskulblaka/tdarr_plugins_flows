@@ -20,19 +20,19 @@ const { analyzeChapters } = require('../domains/chapters/analyze');
 const { analyzeFileInfo } = require('../domains/file/analyze');
 const { analyzeMediaInfo } = require('../domains/media_info/analyze');
 const { analyzeMetadata } = require('../domains/metadata/analyze');
-const { analyzeExternalSubtitleFiles, analyzeSubtitleStreams } = require('../domains/subtitles/analyze');
+const { analyzeSubtitles } = require('../domains/subtitles/analyze');
 
 function analyzeFile(context) {
   const streams = context.file?.ffProbeData?.streams || [];
   const mediaInfoTracks = context.file?.mediaInfo?.track || [];
   const ffProbeChapters = context.file?.ffProbeData?.chapters || [];
   const fileInfo = analyzeFileInfo(context.file, context.settings);
-  const streamInfo = analyzeStreams(streams, mediaInfoTracks, context.file);
+  const subtitleInfo = analyzeSubtitles(streams, mediaInfoTracks, fileInfo);
+  const streamInfo = analyzeStreams(streams, mediaInfoTracks, context.file, subtitleInfo.embedded);
   const chapterInfo = analyzeChapters(mediaInfoTracks, ffProbeChapters, context.file, context);
   const mediaInfo = analyzeMediaInfo(fileInfo.nameNoExtension, mediaInfoTracks);
-  const externalSubtitles = analyzeExternalSubtitleFiles(fileInfo);
   const metadataInfo = analyzeMetadata(streams, context.file?.ffProbeData?.format?.tags || {});
-  const summary = createAnalysisSummary(fileInfo, streamInfo, chapterInfo, metadataInfo, externalSubtitles);
+  const summary = createAnalysisSummary(fileInfo, streamInfo, chapterInfo, metadataInfo, subtitleInfo.external);
 
   const analysis = {
     file: fileInfo,
@@ -40,7 +40,7 @@ function analyzeFile(context) {
     streams: streamInfo,
     summary,
     chapters: chapterInfo.chapters,
-    externalSubtitles,
+    externalSubtitles: subtitleInfo.external,
     metadata: metadataInfo,
     globalTags: metadataInfo.globalTags,
     originalLanguage: null,
@@ -50,17 +50,16 @@ function analyzeFile(context) {
   return analysis;
 }
 
-function analyzeStreams(streams, mediaInfoTracks, file) {
+function analyzeStreams(streams, mediaInfoTracks, file, subtitleInfo) {
   const videoStreams = streams.filter((stream) => stream.codec_type === 'video');
   const audioStreams = streams.filter((stream) => stream.codec_type === 'audio');
-  const subtitleStreams = streams.filter((stream) => stream.codec_type === 'subtitle');
   const attachmentStreams = streams.filter((stream) => stream.codec_type === 'attachment');
 
   const streamInfo = {
     all: streams,
     video: analyzeVideoStreams(videoStreams, mediaInfoTracks, file),
     audio: analyzeAudioStreams(audioStreams, mediaInfoTracks),
-    subtitle: analyzeSubtitleStreams(subtitleStreams, mediaInfoTracks),
+    subtitle: subtitleInfo,
     attachment: analyzeAttachmentStreams(attachmentStreams),
   };
 
@@ -88,7 +87,7 @@ function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, metadataInfo, 
     videoStreamCount: streamInfo.video.count,
     audioStreamCount: streamInfo.audio.count,
     subtitleStreamCount: streamInfo.subtitle.count,
-    externalSubtitleCount: externalSubtitles.length,
+    externalSubtitleCount: externalSubtitles.count,
     attachmentCount: streamInfo.attachment.count,
     chapterCount: chapterInfo.count,
     extraTagStreamCount: metadataInfo.extraTagStreamCount,

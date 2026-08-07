@@ -2,7 +2,7 @@
  * Media Optimizer FFmpeg Subtitle Command Renderer
  * Created by: Freohrskulblaka
  * Created on: 2026-07-21
- * Description: Renders embedded subtitle copies and external SRT imports into FFmpeg arguments.
+ * Description: Renders embedded subtitle copies and external subtitle imports into FFmpeg arguments.
  * Updates:
  * - 2026-08-04 - Freohrskulblaka: Leave kept embedded subtitles as stream copies; only annotate newly imported external subtitles.
  * - 2026-08-04 - Freohrskulblaka: Apply planned subtitle dispositions during active remuxes while preserving embedded subtitle metadata.
@@ -20,10 +20,16 @@ function addExternalSubtitleInputs(subtitlePlan, inputArgs, startingInputIndex) 
       return;
     }
 
-    externalSubtitleInputs.set(track.sourcePath, nextInputIndex);
-    inputArgs.push('-sub_charenc', quoteArg('UTF-8'));
-    inputArgs.push('-f', 'srt');
+    if (track.textEncoding) {
+      inputArgs.push('-sub_charenc', quoteArg('UTF-8'));
+    }
+
+    if (track.inputFormat) {
+      inputArgs.push('-f', track.inputFormat);
+    }
+
     inputArgs.push('-i', quoteArg(track.sourcePath));
+    externalSubtitleInputs.set(track.sourcePath, nextInputIndex);
     nextInputIndex += 1;
   });
 

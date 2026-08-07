@@ -24,7 +24,7 @@ function details() {
     Stage: 'Pre-processing',
     Type: 'Video, Audio, Subtitle',
     Operation: 'Transcode',
-    Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, missing compatibility tracks, commentary removal, subtitle retention and external SRT import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through the Arr connection profile input. Already-compliant files return no-process with a compact summary instead of reprocessing.',
+    Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, missing compatibility tracks, commentary removal, subtitle retention and external subtitle import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through the Arr connection profile input. Already-compliant files return no-process with a compact summary instead of reprocessing.',
     Version: '0.1.0',
     Tags: 'pre-processing, ffmpeg, media optimizer, configurable',
     Inputs: [
@@ -117,7 +117,7 @@ function details() {
           Include Original Language: includes subtitles for the resolved original language in addition to configured subtitle languages.\\n
           Text First: prefers text subtitles before image subtitles. Good when SRT/ASS tracks are preferred by your players.\\n
           Text Only: removes image subtitles and keeps/imports text subtitles only.\\n
-          Matching external SRT sidecars are imported when available. On a later no-process pass, matched sidecars are deleted after an embedded SRT match is confirmed.\\n
+          Matching external subtitle sidecars are imported when available. Supported sidecars: SRT, ASS, SSA, VTT, SUP/PGS. On a later no-process pass, matched text sidecars are deleted after an embedded match is confirmed.\\n
           Forced subtitle intent can be preserved from stream flags or titles such as forced, foreign-only, or signs/songs.\\n
           Example: Picture First + Text with subtitleLanguages eng,spa keeps English/Spanish PGS first, then English/Spanish text tracks.
         `,
@@ -162,7 +162,7 @@ function details() {
           Use ISO-639-2/B three-letter language codes.\\n
           Subtitles are retained and ordered using this list plus the selected subtitle profile.\\n
           Include Original Language adds the resolved original language to subtitle retention.\\n
-          Example: eng,spa keeps English and Spanish subtitle tracks and imports matching English/Spanish SRT sidecars.\\n
+          Example: eng,spa keeps English and Spanish subtitle tracks and imports matching English/Spanish subtitle sidecars.\\n
           Example: eng keeps only English subtitles unless Include Original Language adds another language.
         `,
       },
