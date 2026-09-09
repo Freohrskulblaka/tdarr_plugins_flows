@@ -2,42 +2,41 @@
  * Media Optimizer Track Intent Utility Library
  * Created by: Freohrskulblaka
  * Created on: 2026-07-10
- * Description: Detects reusable track intent signals from stream dispositions and titles.
+ * Description: Detects commentary and descriptive track intent from stream dispositions and titles.
  * Updates:
- * - 2026-07-10 - Freohrskulblaka: Added shared commentary detection.
+ * - 2026-07-10 - Freohrskulblaka: Added shared commentary and descriptive track detection.
  */
 
 const { normalizeVariantText } = require('./language');
 
 const COMMENTARY_TITLE_PATTERNS = [
   /commentary|commentator|director.?s? comment|audio comment/,
-  /descriptive|description|described video|narration|narrator/,
   /comentarios?|comentarios? del director|comentarios? de director|audio comentario|audiocomentario/,
+];
+const DESCRIPTIVE_TITLE_PATTERNS = [
+  /descriptive|description|described video|narration|narrator/,
   /audio descriptivo|audiodescripcion|descripcion de audio|narracion|narrador/,
 ];
 
-function analyzeCommentaryTrack({ disposition, title }) {
+function analyzeTrackIntent({ disposition, title }) {
   const normalizedTitle = normalizeVariantText(title);
-  const hasCommentaryDisposition = Boolean(disposition?.comment || disposition?.descriptions);
-  const matchedTitlePattern = COMMENTARY_TITLE_PATTERNS.find((pattern) => pattern.test(normalizedTitle));
-  const reasons = [];
+  const commentaryReasons = [
+    Boolean(disposition?.comment) ? 'commentary disposition flag' : '',
+    COMMENTARY_TITLE_PATTERNS.some((pattern) => pattern.test(normalizedTitle)) ? 'commentary title keyword' : '',
+  ].filter(Boolean);
+  const descriptiveReasons = [
+    Boolean(disposition?.descriptions) ? 'descriptive disposition flag' : '',
+    DESCRIPTIVE_TITLE_PATTERNS.some((pattern) => pattern.test(normalizedTitle)) ? 'descriptive title keyword' : '',
+  ].filter(Boolean);
 
-  if (hasCommentaryDisposition) {
-    reasons.push('commentary disposition flag');
-  }
-
-  if (matchedTitlePattern) {
-    reasons.push('commentary title keyword');
-  }
-
-  const commentary = {
-    isCommentary: reasons.length > 0,
-    reasons,
+  return {
+    isCommentary: commentaryReasons.length > 0,
+    isDescriptive: descriptiveReasons.length > 0,
+    commentaryReasons,
+    descriptiveReasons,
   };
-
-  return commentary;
 }
 
 module.exports = {
-  analyzeCommentaryTrack,
+  analyzeTrackIntent,
 };

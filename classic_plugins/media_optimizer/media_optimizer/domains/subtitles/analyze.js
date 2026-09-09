@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const { getUniqueValues } = require('../../utils/analysis');
 const { createLanguageLabel, detectLanguageVariant, normalizeLanguageForVariant } = require('../../utils/language');
-const { analyzeCommentaryTrack } = require('../../utils/track_intent');
+const { analyzeTrackIntent } = require('../../utils/track_intent');
 
 const PICTURE_SUBTITLE_CODECS = ['hdmv_pgs_subtitle', 'dvd_subtitle'];
 const TEXT_SUBTITLE_CODECS = ['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'mov_text'];
@@ -74,12 +74,14 @@ function analyzeEmbeddedSubtitleStreams(subtitleStreams, mediaInfoTracks) {
     const textIntent = detectSubtitleTextIntent({stream, title});
     const currentDefault = Boolean(stream.disposition?.default) || mediaInfoSubtitleTrack?.Default === 'Yes';
     const currentForced = Boolean(stream.disposition?.forced) || mediaInfoSubtitleTrack?.Forced === 'Yes';
-    const commentary = analyzeCommentaryTrack({disposition: stream.disposition || {}, title});
+    const trackIntent = analyzeTrackIntent({disposition: stream.disposition || {}, title});
     const subtitleAnalysis = {
       sourceKind: 'embedded', sourceIndex: stream.index, sourcePath: '', sourceOrder, title, language, languageVariant, codec,
       formatLabel, formatKey, subtitleType, frameCount, elementCount, streamSize, bitRate, isEmpty, contentScope,
       accessibility: textIntent.accessibility, currentDefault, currentForced, titleIndicatesForced: textIntent.forced,
-      isCommentary: commentary.isCommentary, commentaryReasons: commentary.reasons, languageLabel: createLanguageLabel(language, languageVariant),
+      isCommentary: trackIntent.isCommentary || trackIntent.isDescriptive,
+      commentaryReasons: [...trackIntent.commentaryReasons, ...trackIntent.descriptiveReasons],
+      languageLabel: createLanguageLabel(language, languageVariant),
     };
 
     return subtitleAnalysis;
@@ -145,14 +147,16 @@ function analyzeExternalSubtitleFiles(fileInfo) {
       const isEmpty = streamSize === 0 || cueCount === 0;
       const contentScope = isEmpty ? 'empty' : cueCount === null ? 'unknown' : cueCount <= 250 ? 'sparse' : 'full';
       const textIntent = detectSubtitleTextIntent({title: baseName});
-      const commentary = analyzeCommentaryTrack({title: baseName});
+      const trackIntent = analyzeTrackIntent({title: baseName});
       const externalSubtitle = {
         sourceKind: 'external', sourceIndex: null, sourcePath, sourceOrder: externalSubtitles.length, fileName,
         title: '', suffix, codec: format.codec, formatLabel: format.formatLabel, formatKey: format.formatKey, subtitleType: format.subtitleType,
         inputFormat: format.inputFormat, textEncoding: format.textEncoding, language, languageVariant, frameCount: cueCount,
         elementCount: cueCount, streamSize, bitRate: null, isEmpty, contentScope,
         accessibility: textIntent.accessibility, currentDefault: false, currentForced: false, titleIndicatesForced: textIntent.forced,
-        isCommentary: commentary.isCommentary, commentaryReasons: commentary.reasons, languageLabel: createLanguageLabel(language, languageVariant),
+        isCommentary: trackIntent.isCommentary || trackIntent.isDescriptive,
+        commentaryReasons: [...trackIntent.commentaryReasons, ...trackIntent.descriptiveReasons],
+        languageLabel: createLanguageLabel(language, languageVariant),
       };
 
       externalSubtitles.push(externalSubtitle);

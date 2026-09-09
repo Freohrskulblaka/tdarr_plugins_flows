@@ -30,10 +30,12 @@ const VIDEO_CODEC_PROFILES = {
 };
 
 const AUDIO_PROFILES = {
-  'Keep 5.1 and Stereo': { keepSevenOne: false, createMissingFiveOne: true, createMissingStereo: true, removeCommentary: true },
-  'Keep 7.1, 5.1, and Stereo': { keepSevenOne: true, createMissingFiveOne: true, createMissingStereo: true, removeCommentary: true },
-  'Stereo Only': { keepSevenOne: false, createMissingFiveOne: false, createMissingStereo: true, removeCommentary: true },
-  'Preserve Audio': { keepSevenOne: true, createMissingFiveOne: false, createMissingStereo: false, removeCommentary: true },
+  'Compatibility 5.1 + Stereo': { preserveOriginals: false, keepBestSurround: '', createMissingFiveOne: true, createMissingStereo: true },
+  'Best 5.1 + Compatibility': { preserveOriginals: false, keepBestSurround: '5.1', createMissingFiveOne: true, createMissingStereo: true },
+  'Best 7.1 + Compatibility': { preserveOriginals: false, keepBestSurround: '7.1', createMissingFiveOne: true, createMissingStereo: true },
+  'Preserve All + Compatibility': { preserveOriginals: true, keepBestSurround: '', createMissingFiveOne: true, createMissingStereo: true },
+  'Stereo Only': { preserveOriginals: false, keepBestSurround: '', createMissingFiveOne: false, createMissingStereo: true },
+  'Preserve Original Audio': { preserveOriginals: true, keepBestSurround: '', createMissingFiveOne: false, createMissingStereo: false },
 };
 
 const SUBTITLE_PROFILES = {

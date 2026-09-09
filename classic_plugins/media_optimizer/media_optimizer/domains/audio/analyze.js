@@ -11,21 +11,22 @@
  */
 
 const { getUniqueValues } = require('../../utils/analysis');
-const {
-  createLanguageLabel: createAudioLanguageLabel,
-  detectLanguageVariant,
-  normalizeLanguageForVariant: normalizeAudioLanguage,
-} = require('../../utils/language');
-const { analyzeCommentaryTrack } = require('../../utils/track_intent');
+const { createLanguageLabel, detectLanguageVariant, normalizeLanguageForVariant } = require('../../utils/language');
+const { analyzeTrackIntent } = require('../../utils/track_intent');
+
+const AUDIO_CODEC_ALIASES = { 'ac-3': 'ac3', 'e-ac-3': 'eac3', 'mlp fba': 'truehd' };
 
 function analyzeAudioStreams(audioStreams, mediaInfoTracks) {
   const mediaInfoAudioTracks = mediaInfoTracks.filter((track) => track['@type'] === 'Audio');
   const enrichedAudioStreams = audioStreams.map((stream, streamIndex) => {
-    const mediaInfoAudioTrack = findAudioMediaInfoTrack(mediaInfoAudioTracks, streamIndex);
+    const mediaInfoAudioTrack = mediaInfoAudioTracks.find((track) => String(track.StreamOrder) === String(stream.index))
+      || mediaInfoAudioTracks[streamIndex]
+      || null;
     return enrichAudioStream(stream, mediaInfoAudioTrack);
   });
   const languages = getUniqueValues(enrichedAudioStreams, (stream) => stream.analysis.audio.language);
-  const audioInfo = {
+
+  return {
     items: enrichedAudioStreams,
     count: enrichedAudioStreams.length,
     hasStreams: enrichedAudioStreams.length > 0,
@@ -34,37 +35,58 @@ function analyzeAudioStreams(audioStreams, mediaInfoTracks) {
     hasUntaggedStreams: languages.includes('und'),
     languages,
     channels: getUniqueValues(enrichedAudioStreams, (stream) => stream.analysis.audio.channels || 'unknown'),
-    channelFamilies: getUniqueValues(enrichedAudioStreams, (stream) => stream.analysis.audio.channelFamily),
     codecs: getUniqueValues(enrichedAudioStreams, (stream) => stream.analysis.audio.codec),
   };
-
-  return audioInfo;
 }
 
 function enrichAudioStream(stream, mediaInfoAudioTrack) {
-  const title = stream.tags?.title || '';
-  const language = normalizeAudioLanguage(stream.tags?.language || 'und');
-  const languageVariant = detectAudioLanguageVariant(stream, mediaInfoAudioTrack, language);
-  const channels = Number(stream.channels || 0);
+  const title = stream.tags?.title || stream.tags?.TITLE || mediaInfoAudioTrack?.Title || '';
+  const language = normalizeLanguageForVariant(stream.tags?.language || stream.tags?.LANGUAGE || mediaInfoAudioTrack?.Language || 'und');
+  const languageVariant = detectLanguageVariant(
+    language,
+    [stream.tags?.language, stream.tags?.LANGUAGE, mediaInfoAudioTrack?.Language],
+    [stream.tags?.title, stream.tags?.TITLE, mediaInfoAudioTrack?.Title],
+  );
+  const parsedChannels = Number.parseFloat(stream.channels || mediaInfoAudioTrack?.Channels || 0);
+  const channels = Number.isFinite(parsedChannels) ? parsedChannels : 0;
   const channelFamily = getAudioChannelFamily(channels);
-  const codec = normalizeAudioCodec(stream.codec_name || 'unknown');
-  const profile = stream.profile || '';
-  const currentDefault = Boolean(stream.disposition?.default);
-  const bitrate = parseAudioBitrate(stream.bit_rate || stream.tags?.BPS || mediaInfoAudioTrack?.BitRate);
-  const commentary = analyzeAudioCommentary(stream);
+  const rawCodec = String(stream.codec_name || mediaInfoAudioTrack?.Format || 'unknown').trim().toLowerCase();
+  const codec = AUDIO_CODEC_ALIASES[rawCodec] || rawCodec.replace(/[^a-z0-9]+/g, '');
+  const profile = stream.profile || mediaInfoAudioTrack?.Format_Profile || mediaInfoAudioTrack?.Format_Commercial_IfAny || '';
+  const formatText = [profile, stream.codec_long_name, title, mediaInfoAudioTrack?.Format_Commercial_IfAny, mediaInfoAudioTrack?.Format_AdditionalFeatures]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  let formatKey = codec;
+
+  if (formatText.includes('atmos')) {
+    formatKey = 'atmos';
+  } else if (codec === 'dts' && ['dts-hd ma', 'master audio', 'ma / core', 'xll'].some((label) => formatText.includes(label))) {
+    formatKey = 'dts-hd ma';
+  }
+  const currentDefault = Boolean(stream.disposition?.default) || String(mediaInfoAudioTrack?.Default || '').toLowerCase() === 'yes';
+  const parsedBitrate = Number(stream.bit_rate || stream.tags?.BPS || stream.tags?.bps || mediaInfoAudioTrack?.BitRate);
+  const bitrate = Number.isFinite(parsedBitrate) ? parsedBitrate : 0;
+  const trackIntent = analyzeTrackIntent({
+    disposition: stream.disposition || {},
+    title,
+  });
   const audioAnalysis = {
     title,
     language,
     languageVariant,
-    languageLabel: createAudioLanguageLabel(language, languageVariant),
+    languageLabel: createLanguageLabel(language, languageVariant),
     channels,
     channelFamily,
     codec,
+    formatKey,
     profile,
     currentDefault,
     bitrate,
-    isCommentary: commentary.isCommentary,
-    commentaryReasons: commentary.reasons,
+    isCommentary: trackIntent.isCommentary,
+    isDescriptive: trackIntent.isDescriptive,
+    commentaryReasons: trackIntent.commentaryReasons,
+    descriptiveReasons: trackIntent.descriptiveReasons,
   };
   const enrichedStream = Object.assign({}, stream, {
     analysis: Object.assign({}, stream.analysis || {}, {
@@ -73,15 +95,6 @@ function enrichAudioStream(stream, mediaInfoAudioTrack) {
   });
 
   return enrichedStream;
-}
-
-function findAudioMediaInfoTrack(mediaInfoAudioTracks, streamIndex) {
-  const streamOrder = String(streamIndex + 1);
-  const mediaInfoTrack = mediaInfoAudioTracks.find((track) => String(track.StreamOrder) === streamOrder)
-    || mediaInfoAudioTracks[streamIndex]
-    || null;
-
-  return mediaInfoTrack;
 }
 
 function getAudioChannelFamily(channels) {
@@ -93,46 +106,11 @@ function getAudioChannelFamily(channels) {
     return '5.1';
   }
 
-  if (channels <= 2) {
+  if (channels > 0 && channels <= 2) {
     return 'stereo';
   }
 
   return 'other';
-}
-
-function analyzeAudioCommentary(stream) {
-  const title = stream.tags?.title || stream.tags?.TITLE || '';
-  const commentary = analyzeCommentaryTrack({
-    disposition: stream.disposition || {},
-    title,
-  });
-
-  return commentary;
-}
-
-function detectAudioLanguageVariant(stream, mediaInfoTrack, language) {
-  const languageFields = [
-    stream.tags?.language,
-    stream.tags?.LANGUAGE,
-    mediaInfoTrack?.Language,
-  ];
-  const titleFields = [
-    stream.tags?.title,
-    stream.tags?.TITLE,
-    mediaInfoTrack?.Title,
-  ];
-  const languageVariant = detectLanguageVariant(language, languageFields, titleFields);
-
-  return languageVariant;
-}
-
-function normalizeAudioCodec(codec) {
-  return String(codec || 'unknown').trim().toLowerCase();
-}
-
-function parseAudioBitrate(value) {
-  const parsedValue = Number(value);
-  return Number.isFinite(parsedValue) ? parsedValue : 0;
 }
 
 module.exports = {

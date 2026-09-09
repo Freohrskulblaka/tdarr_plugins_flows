@@ -55,7 +55,11 @@ function prepareConfig(inputs) {
         video: audioLanguageOrder[0] || 'und',
       },
       video: profileConfig.settings.video,
-      audio: profileConfig.settings.audio,
+      audio: {
+        ...profileConfig.settings.audio,
+        keepCommentary: inputs.keepAudioCommentary === true || inputs.keepAudioCommentary === 'true',
+        keepDescriptive: inputs.keepDescriptiveAudio === true || inputs.keepDescriptiveAudio === 'true',
+      },
       subtitle: profileConfig.settings.subtitle,
       metadata: profileConfig.settings.metadata,
     },

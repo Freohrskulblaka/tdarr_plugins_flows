@@ -24,7 +24,7 @@ function details() {
     Stage: 'Pre-processing',
     Type: 'Video, Audio, Subtitle',
     Operation: 'Transcode',
-    Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, missing compatibility tracks, commentary removal, subtitle retention and external subtitle import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through the Arr connection profile input. Already-compliant files return no-process with a compact summary instead of reprocessing.',
+    Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, normalized compatibility tracks, commentary and descriptive-audio handling, subtitle retention and external subtitle import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through the Arr connection profile input. Already-compliant files return no-process with a compact summary instead of reprocessing.',
     Version: '0.1.0',
     Tags: 'pre-processing, ffmpeg, media optimizer, configurable',
     Inputs: [
@@ -88,19 +88,56 @@ function details() {
       {
         name: 'audioProfile',
         type: 'string',
-        defaultValue: 'Keep 5.1 and Stereo',
+        defaultValue: 'Compatibility 5.1 + Stereo',
         inputUI: {
           type: 'dropdown',
-          options: ['Keep 5.1 and Stereo', 'Keep 7.1, 5.1, and Stereo', 'Stereo Only', 'Preserve Audio'],
+          options: [
+            'Compatibility 5.1 + Stereo',
+            'Best 5.1 + Compatibility',
+            'Best 7.1 + Compatibility',
+            'Preserve All + Compatibility',
+            'Stereo Only',
+            'Preserve Original Audio',
+          ],
         },
         tooltip: `
           Select the audio channel policy.\\n
-          Keep 5.1 and Stereo: normal movie/TV profile. Keeps or creates one 5.1 track and one stereo track for each target language when a usable source exists.\\n
-          Keep 7.1, 5.1, and Stereo: keeps 7.1 sources and still creates lower-channel compatibility tracks when needed.\\n
+          Compatibility 5.1 + Stereo: keeps or creates AC3 5.1 and AAC stereo tracks, using higher-quality sources when available.\\n
+          Best 5.1 + Compatibility: also keeps the best Atmos, DTS-HD MA, or DTS 5.1 source.\\n
+          Best 7.1 + Compatibility: also keeps the best Atmos, DTS-HD MA, or DTS 7.1 source.\\n
+          Preserve All + Compatibility: retains every eligible original and adds missing AC3 5.1 and AAC stereo tracks.\\n
           Stereo Only: keeps or creates stereo output where possible. Useful for small devices or simple playback stacks.\\n
-          Preserve Audio: avoids conversion/downmixing. Still allows language tagging, ordering, default cleanup, and commentary removal planning.\\n
-          Commentary tracks are removed when the audio profile enables commentary cleanup.\\n
-          Example: Keep 5.1 and Stereo can create AAC stereo from a 5.1/7.1 source; it does not create 5.1 from stereo-only audio.
+          Preserve Original Audio: retains eligible originals without creating compatibility tracks.\\n
+          Generated compatibility tracks use single-pass loudness normalization to reduce extreme differences between quiet and loud sections.\\n
+          Example: Best 5.1 + Compatibility can keep DTS-HD MA 5.1 beside AC3 5.1 and AAC stereo.
+        `,
+      },
+      {
+        name: 'keepAudioCommentary',
+        type: 'boolean',
+        defaultValue: false,
+        inputUI: {
+          type: 'dropdown',
+          options: ['false', 'true'],
+        },
+        tooltip: `
+          Keep commentary audio for configured languages.\\n
+          Commentary tracks retain their source codec and channel layout, are placed after regular audio, and never produce compatibility tracks.\\n
+          Disabled by default.
+        `,
+      },
+      {
+        name: 'keepDescriptiveAudio',
+        type: 'boolean',
+        defaultValue: true,
+        inputUI: {
+          type: 'dropdown',
+          options: ['false', 'true'],
+        },
+        tooltip: `
+          Preserve descriptive audio and narration tracks for configured languages.\\n
+          Descriptive tracks retain their source codec and channel layout, are placed after regular audio, and never produce compatibility tracks.\\n
+          Enabled by default to preserve accessibility content.
         `,
       },
       {
