@@ -5,14 +5,13 @@
  * Description: Builds subtitle retention, removal, ordering, and default/forced disposition decisions.
  */
 
-const { createLanguageLabel, normalizeLanguageForVariant } = require('../../utils/language');
+const { normalizeLanguageForVariant } = require('../../utils/language');
 
 const SUBTITLE_LANGUAGE_TITLE_LABELS = { eng: 'English', spa: 'Spanish', fre: 'French', fra: 'French', por: 'Portuguese' };
 const SUBTITLE_VARIANT_TITLE_LABELS = { LatAm: 'Latin America', ES: 'Spain', MX: 'Mexico', BR: 'Brazil', PT: 'Portugal', US: 'US' };
 const PICTURE_FIRST_SUBTITLE_TYPE_RANK = { picture: 0, text: 1, other: 2 };
 const TEXT_FIRST_SUBTITLE_TYPE_RANK = { text: 0, picture: 1, other: 2 };
 const SUBTITLE_CONTENT_SCOPE_RANK = { full: 0, unknown: 1, sparse: 2, empty: 3 };
-const SUBTITLE_FORMAT_KEY_ALIASES = { hdmv_pgs_subtitle: 'pgs', pgs: 'pgs', srt: 'srt', subrip: 'srt' };
 
 function planSubtitles(context) {
   const embeddedSubtitles = context.analysis.streams.subtitle.items;
@@ -20,9 +19,8 @@ function planSubtitles(context) {
   const originalLanguage = normalizeLanguageForVariant(context.analysis.originalLanguage?.language || '');
   const desiredLanguages = [...configuredLanguages, ...(context.settings.subtitle.includeOriginalLanguage ? [originalLanguage] : [])];
   const languageOrder = Array.from(new Set(desiredLanguages.filter(Boolean)));
-  const preserveExistingTitles = Boolean(context.analysis.streams.subtitle.preserveExistingTitles);
-  const embeddedTracks = embeddedSubtitles.map((subtitle) => createSubtitleTrack(subtitle, preserveExistingTitles));
-  const externalDiscovery = discoverExternalSubtitleImports(context, embeddedTracks, languageOrder, preserveExistingTitles);
+  const embeddedTracks = embeddedSubtitles.map((subtitle) => createSubtitleTrack(subtitle));
+  const externalDiscovery = discoverExternalSubtitleImports(context, embeddedTracks, languageOrder);
   const candidateTracks = [...embeddedTracks, ...externalDiscovery.imports];
   const keptTracks = selectSubtitleTracks(candidateTracks, context, languageOrder);
   const removedTracks = candidateTracks.filter((track) => track.action === 'remove');
@@ -50,31 +48,15 @@ function planSubtitles(context) {
   };
 }
 
-function createSubtitleTrack(subtitleAnalysis, preserveExistingTitles, sourceOrderOverride) {
+function createSubtitleTrack(subtitleAnalysis, sourceOrderOverride) {
   const isExternal = subtitleAnalysis.sourceKind === 'external';
   const title = subtitleAnalysis.title;
   const desiredForced = isExternal ? subtitleAnalysis.titleIndicatesForced : subtitleAnalysis.currentForced || subtitleAnalysis.titleIndicatesForced;
-  const desiredTitle = createSubtitleTitle(subtitleAnalysis, preserveExistingTitles, desiredForced);
-  const codec = String(subtitleAnalysis.codec || '').toLowerCase();
-  const format = String(subtitleAnalysis.formatLabel || '').toLowerCase();
-  const formatKey = SUBTITLE_FORMAT_KEY_ALIASES[codec] || SUBTITLE_FORMAT_KEY_ALIASES[format] || codec || format || 'unknown';
+  const desiredTitle = createSubtitleTitle(subtitleAnalysis, desiredForced);
   const track = {
-    sourceKind: subtitleAnalysis.sourceKind,
-    sourceIndex: subtitleAnalysis.sourceIndex,
-    sourcePath: subtitleAnalysis.sourcePath,
+    ...subtitleAnalysis,
     sourceOrder: sourceOrderOverride ?? subtitleAnalysis.sourceOrder,
-    fileName: subtitleAnalysis.fileName,
     outputIndex: null,
-    codec: subtitleAnalysis.codec,
-    formatLabel: subtitleAnalysis.formatLabel,
-    formatKey,
-    inputFormat: subtitleAnalysis.inputFormat,
-    textEncoding: subtitleAnalysis.textEncoding,
-    language: subtitleAnalysis.language,
-    languageVariant: subtitleAnalysis.languageVariant,
-    languageLabel: subtitleAnalysis.languageLabel || createLanguageLabel(subtitleAnalysis.language, subtitleAnalysis.languageVariant),
-    subtitleType: subtitleAnalysis.subtitleType,
-    title,
     desiredTitle,
     titleNeedsUpdate: title !== desiredTitle,
     action: isExternal ? 'import' : 'copy',
@@ -82,16 +64,6 @@ function createSubtitleTrack(subtitleAnalysis, preserveExistingTitles, sourceOrd
     forced: desiredForced,
     currentDefault: isExternal ? false : subtitleAnalysis.currentDefault,
     currentForced: isExternal ? false : subtitleAnalysis.currentForced,
-    titleIndicatesForced: subtitleAnalysis.titleIndicatesForced,
-    isCommentary: subtitleAnalysis.isCommentary,
-    isEmpty: subtitleAnalysis.isEmpty,
-    contentScope: subtitleAnalysis.contentScope,
-    accessibility: subtitleAnalysis.accessibility,
-    frameCount: subtitleAnalysis.frameCount,
-    elementCount: subtitleAnalysis.elementCount,
-    streamSize: subtitleAnalysis.streamSize,
-    bitRate: subtitleAnalysis.bitRate,
-    commentaryReasons: subtitleAnalysis.commentaryReasons,
     reasons: [],
   };
 
@@ -170,7 +142,7 @@ function assignSubtitleOutputIndexes(tracks) {
   });
 }
 
-function discoverExternalSubtitleImports(context, embeddedSubtitleTracks, languageOrder, preserveExistingTitles) {
+function discoverExternalSubtitleImports(context, embeddedSubtitleTracks, languageOrder) {
   const discovery = {imports: [], matchedExternalSubtitles: []};
 
   if (!context.settings.subtitle.importExternalSubtitles) {
@@ -185,7 +157,7 @@ function discoverExternalSubtitleImports(context, embeddedSubtitleTracks, langua
     }
 
     const sourceOrder = embeddedSubtitleTracks.length + discovery.imports.length;
-    const externalTrack = createSubtitleTrack(externalSubtitle, preserveExistingTitles, sourceOrder);
+    const externalTrack = createSubtitleTrack(externalSubtitle, sourceOrder);
     const externalTitle = String(externalTrack.desiredTitle || '').trim().toLowerCase().replace(/\s+/g, ' ');
     const embeddedMatch = embeddedSubtitleTracks.find((track) => {
       const sameLanguage = track.language === externalTrack.language;
@@ -199,12 +171,12 @@ function discoverExternalSubtitleImports(context, embeddedSubtitleTracks, langua
 
       const metrics = compareSubtitleMetrics(track, externalTrack);
 
-      if (metrics.hasMatchingMetric) {
-        return true;
-      }
-
       if (metrics.hasCountConflict) {
         return false;
+      }
+
+      if (metrics.hasMatchingMetric) {
+        return true;
       }
 
       const embeddedTitle = String(track.title || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -249,7 +221,7 @@ function compareSubtitleMetrics(embeddedSubtitle, externalSubtitle) {
     const bothExist = embeddedExists && externalExists;
     const valuesMatch = bothExist && Number(metric.embedded) === Number(metric.external);
 
-    comparison.hasComparableMetric ||= embeddedExists || externalExists;
+    comparison.hasComparableMetric ||= bothExist;
     comparison.hasMatchingMetric ||= valuesMatch;
     comparison.hasCountConflict ||= metric.detectsConflict && bothExist && !valuesMatch;
   });
@@ -257,10 +229,10 @@ function compareSubtitleMetrics(embeddedSubtitle, externalSubtitle) {
   return comparison;
 }
 
-function createSubtitleTitle(track, preserveExistingTitle, forced) {
-  const existingTitle = String(track.title || '').trim();
+function createSubtitleTitle(track, forced) {
+  const existingTitle = String(track.title || '');
 
-  if (preserveExistingTitle && existingTitle) {
+  if (existingTitle.trim()) {
     return existingTitle;
   }
 

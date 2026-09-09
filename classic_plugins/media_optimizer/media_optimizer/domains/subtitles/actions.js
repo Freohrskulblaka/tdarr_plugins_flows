@@ -17,7 +17,7 @@ function runSubtitleActions(context) {
   }
 
   cleanupMatchedExternalSubtitleSidecars(context);
-  repairSubtitleDispositions(context);
+  repairSubtitleMetadata(context);
 }
 
 function cleanupMatchedExternalSubtitleSidecars(context) {
@@ -59,15 +59,15 @@ function cleanupMatchedExternalSubtitleSidecars(context) {
   }
 }
 
-function repairSubtitleDispositions(context) {
+function repairSubtitleMetadata(context) {
   const subtitleTracks = context.plan?.subtitles?.tracks || [];
-  const dispositionUpdates = subtitleTracks.filter((track) => {
+  const subtitleUpdates = subtitleTracks.filter((track) => {
     const dispositionChanged = track.default !== track.currentDefault || track.forced !== track.currentForced;
-    return track.sourceKind === 'embedded' && dispositionChanged;
+    return track.sourceKind === 'embedded' && (track.titleNeedsUpdate || dispositionChanged);
   });
   const shouldRepair = context.plan?.container?.targetContainer === 'mkv'
     && context.analysis?.file?.container === 'mkv'
-    && dispositionUpdates.length > 0;
+    && subtitleUpdates.length > 0;
 
   if (!shouldRepair) {
     return;
@@ -76,19 +76,22 @@ function repairSubtitleDispositions(context) {
   const filePath = context.file?._id || context.file?.file;
 
   if (!filePath) {
-    context.log.warn('Unable to repair subtitle default flags because the file path is missing.');
+    context.log.warn('Unable to repair subtitle metadata because the file path is missing.');
     return;
   }
 
   const args = [filePath];
-  dispositionUpdates.forEach((track) => {
+  subtitleUpdates.forEach((track) => {
+    const changes = [
+      track.titleNeedsUpdate && `name=${track.title}`,
+      track.default !== track.currentDefault && `flag-default=${track.default ? '1' : '0'}`,
+      track.forced !== track.currentForced && `flag-forced=${track.forced ? '1' : '0'}`,
+    ].filter(Boolean).flatMap((change) => ['--set', change]);
+
     args.push(
       '--edit',
       `track:s${track.sourceOrder + 1}`,
-      '--set',
-      `flag-default=${track.default ? '1' : '0'}`,
-      '--set',
-      `flag-forced=${track.forced ? '1' : '0'}`,
+      ...changes,
     );
   });
 
@@ -103,13 +106,14 @@ function repairSubtitleDispositions(context) {
       proc.execFileSync('mkvpropedit', args, { stdio: 'pipe' });
     }
 
-    context.log.info('Repaired subtitle default flags in place with mkvpropedit', dispositionUpdates.map((track) => ({
+    context.log.info('Repaired subtitle metadata in place with mkvpropedit', subtitleUpdates.map((track) => ({
       subtitleIndex: track.sourceOrder,
+      title: track.title,
       default: track.default,
       forced: track.forced,
     })));
   } catch (error) {
-    context.log.warn('Unable to repair subtitle default flags in place with mkvpropedit', {
+    context.log.warn('Unable to repair subtitle metadata in place with mkvpropedit', {
       error: error.message,
     });
   }

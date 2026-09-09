@@ -16,7 +16,6 @@ function buildSubtitleCommandArgs(subtitlePlan, streamIndexes, startingInputInde
   const outputArgs = [];
   const externalSubtitleInputs = new Map();
   let nextInputIndex = startingInputIndex;
-  const shouldApplyDispositions = subtitlePlan?.shouldProcess === true;
 
   (subtitlePlan?.tracks || []).forEach((track) => {
     const isExternal = track.sourceKind === 'external';
@@ -37,13 +36,12 @@ function buildSubtitleCommandArgs(subtitlePlan, streamIndexes, startingInputInde
 
     outputArgs.push('-map', inputSpecifier, `-c:s:${outputIndex}`, 'copy');
 
-    if (isExternal) {
-      addStreamMetadata(outputArgs, 's', outputIndex, { language: track.language, title: track.title });
+    if (isExternal || track.titleNeedsUpdate) {
+      const metadata = isExternal ? {language: track.language, title: track.title} : {title: track.title};
+      addStreamMetadata(outputArgs, 's', outputIndex, metadata);
     }
 
-    if (shouldApplyDispositions) {
-      addDisposition(outputArgs, 's', outputIndex, { default: track.default, forced: track.forced });
-    }
+    addDisposition(outputArgs, 's', outputIndex, {default: track.default, forced: track.forced});
 
     streamIndexes.subtitle += 1;
   });
