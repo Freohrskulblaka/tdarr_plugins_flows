@@ -35,6 +35,8 @@ const EXTERNAL_SUBTITLE_FORMATS = {
 function analyzeSubtitles(streams, mediaInfoTracks, fileInfo) {
   const subtitleStreams = streams.filter((stream) => stream.codec_type === 'subtitle');
   const embedded = analyzeEmbeddedSubtitleStreams(subtitleStreams, mediaInfoTracks);
+  const subtitleTitleText = [fileInfo.id, fileInfo.directory, fileInfo.nameNoExtension].join(' ').toLowerCase();
+  embedded.preserveExistingTitles = subtitleTitleText.includes('anime');
   const external = analyzeExternalSubtitleFiles(fileInfo);
   const subtitleAnalysis = {embedded, external};
 
