@@ -54,13 +54,13 @@ function buildAudioOutputPath(context, stream) {
 }
 
 function buildSubtitleOutputPath(context, stream) {
-  const subtitle = stream.analysis.subtitle;
+  const subtitle = getSubtitleAnalysis(stream);
   const forced = subtitle.currentForced ? 'forced' : '';
   const accessibility = subtitle.accessibility && subtitle.accessibility !== 'regular' ? subtitle.accessibility : '';
   const parts = [
     context.analysis.file.nameNoExtension,
     'subtitle',
-    String(stream.index),
+    String(subtitle.sourceIndex),
     subtitle.language || 'und',
     subtitle.subtitleType || '',
     subtitle.languageVariant || '',
@@ -86,6 +86,10 @@ function sanitizeToken(value) {
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
     .replace(/\s+/g, '_')
     .replace(/^\.+|\.+$/g, '');
+}
+
+function getSubtitleAnalysis(stream) {
+  return stream.analysis?.subtitle || stream;
 }
 
 module.exports = {

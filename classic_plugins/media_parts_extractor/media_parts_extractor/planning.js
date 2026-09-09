@@ -74,17 +74,21 @@ function planSubtitles(context) {
   const languages = context.settings.languageOrder.subtitle;
   const items = context.analysis.streams.subtitle.items
     .filter((stream) => shouldExtractSubtitle(stream, mode, languages))
-    .map((stream) => ({
-      sourceIndex: stream.index,
-      language: stream.analysis.subtitle.language,
-      languageVariant: stream.analysis.subtitle.languageVariant,
-      codec: stream.analysis.subtitle.codec,
-      subtitleType: stream.analysis.subtitle.subtitleType,
-      currentForced: stream.analysis.subtitle.currentForced,
-      accessibility: stream.analysis.subtitle.accessibility,
-      title: stream.analysis.subtitle.title,
-      outputPath: buildSubtitleOutputPath(context, stream),
-    }));
+    .map((stream) => {
+      const subtitle = getSubtitleAnalysis(stream);
+
+      return {
+        sourceIndex: subtitle.sourceIndex,
+        language: subtitle.language,
+        languageVariant: subtitle.languageVariant,
+        codec: subtitle.codec,
+        subtitleType: subtitle.subtitleType,
+        currentForced: subtitle.currentForced,
+        accessibility: subtitle.accessibility,
+        title: subtitle.title,
+        outputPath: buildSubtitleOutputPath(context, stream),
+      };
+    });
   const reasons = [];
 
   if (mode === 'None') {
@@ -114,7 +118,7 @@ function shouldExtractAudio(stream, mode, languages) {
 }
 
 function shouldExtractSubtitle(stream, mode, languages) {
-  const subtitle = stream.analysis.subtitle;
+  const subtitle = getSubtitleAnalysis(stream);
 
   if (mode === 'None') {
     return false;
@@ -133,6 +137,10 @@ function shouldExtractSubtitle(stream, mode, languages) {
   }
 
   return true;
+}
+
+function getSubtitleAnalysis(stream) {
+  return stream.analysis?.subtitle || stream;
 }
 
 module.exports = {
