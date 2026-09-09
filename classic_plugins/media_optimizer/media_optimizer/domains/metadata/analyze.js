@@ -10,16 +10,32 @@
 function analyzeMetadata(streams, formatTags) {
   const normalizedGlobalTags = normalizeTags(formatTags);
   const fileTitle = getTagValue(normalizedGlobalTags, ['title']);
-  const videoTitleStreams = streams
-    .filter((stream) => stream.codec_type === 'video')
-    .map(normalizeVideoTitleStream)
+  const normalizedStreams = streams.map((stream) => {
+    const tags = normalizeTags(stream?.tags || {});
+
+    return {
+      sourceIndex: stream?.index,
+      codecType: String(stream?.codec_type || '').toLowerCase(),
+      codecName: String(stream?.codec_name || '').toLowerCase(),
+      title: getTagValue(tags, ['title']),
+      handlerName: getTagValue(tags, ['handler_name']),
+    };
+  });
+  const videoTitleStreams = normalizedStreams
+    .filter((stream) => stream.codecType === 'video')
+    .map((stream, sourceOrder) => ({sourceIndex: stream.sourceIndex, sourceOrder, title: stream.title}))
     .filter((stream) => stream.title);
-  const extraTagStreams = streams
-    .filter(isExtraTagStream)
-    .map(normalizeExtraTagStream);
+  const extraTagStreams = normalizedStreams.filter((stream) => {
+    return stream.codecType === 'data'
+      || stream.codecType === 'unknown' && /tag|metadata/.test(`${stream.codecName} ${stream.title} ${stream.handlerName}`.toLowerCase());
+  }).map((stream) => ({
+    sourceIndex: stream.sourceIndex,
+    codecType: stream.codecType,
+    codecName: stream.codecName,
+    title: stream.title || stream.handlerName,
+  }));
 
   return {
-    globalTags: normalizedGlobalTags,
     globalTagKeys: Object.keys(normalizedGlobalTags),
     fileTitle,
     hasFileTitle: Boolean(fileTitle),
@@ -29,45 +45,6 @@ function analyzeMetadata(streams, formatTags) {
     extraTagStreamCount: extraTagStreams.length,
     hasExtraTagStreams: extraTagStreams.length > 0,
   };
-}
-
-function normalizeVideoTitleStream(stream) {
-  const tags = normalizeTags(stream?.tags || {});
-
-  return {
-    sourceIndex: stream?.index,
-    codecType: stream?.codec_type || '',
-    codecName: stream?.codec_name || '',
-    title: getTagValue(tags, ['title']),
-  };
-}
-
-function normalizeExtraTagStream(stream) {
-  const tags = normalizeTags(stream?.tags || {});
-
-  return {
-    sourceIndex: stream?.index,
-    codecType: stream?.codec_type || '',
-    codecName: stream?.codec_name || '',
-    title: getTagValue(tags, ['title', 'handler_name']),
-    tagKeys: Object.keys(tags),
-  };
-}
-
-function isExtraTagStream(stream) {
-  const codecType = String(stream?.codec_type || '').toLowerCase();
-  const codecName = String(stream?.codec_name || '').toLowerCase();
-  const title = String(stream?.tags?.title || stream?.tags?.TITLE || stream?.tags?.handler_name || '').toLowerCase();
-
-  if (codecType === 'data') {
-    return true;
-  }
-
-  if (codecType === 'unknown' && /tag|metadata/.test(codecName)) {
-    return true;
-  }
-
-  return codecType === 'unknown' && /tag|metadata/.test(title);
 }
 
 function normalizeTags(tags) {

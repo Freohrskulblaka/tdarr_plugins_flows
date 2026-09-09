@@ -269,7 +269,6 @@ function renderMetadata(lines, metadataPlan) {
   lines.push(`  removeFileTitle=${metadataPlan.removeFileTitle ? 'yes' : 'no'} fileTitle=${metadataPlan.fileTitle ? 'yes' : 'no'}`);
   lines.push(`  removeVideoTitles=${metadataPlan.removeVideoTitles ? 'yes' : 'no'} titledVideoStreams=${metadataPlan.videoTitleTracks.length}`);
   lines.push(`  removeExtraTagStreams=${metadataPlan.removeExtraTagStreams ? 'yes' : 'no'} extraTagStreams=${metadataPlan.extraTagTracks.length}`);
-  lines.push(`  writeCustomGlobalMetadata=${metadataPlan.writeCustomGlobalMetadata ? 'yes' : 'no'}`);
 
   metadataPlan.videoTitleTracks.forEach((track) => {
     lines.push(`  video src=${track.sourceIndex} action=${track.action} title="${track.title}"`);

@@ -42,7 +42,6 @@ function analyzeFile(context) {
     chapters: chapterInfo.chapters,
     externalSubtitles: subtitleInfo.external,
     metadata: metadataInfo,
-    globalTags: metadataInfo.globalTags,
     originalLanguage: null,
     videoSettings: context.settings.video,
   };

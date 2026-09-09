@@ -9,7 +9,7 @@
 const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-arr-profile-2026-08-05-38';
 const { loadInputs, prepareConfig, createContext } = require('./media_optimizer/runtime/config');
 const { createResponse } = require('./media_optimizer/runtime/response');
-const { runSubtitleActions } = require('./media_optimizer/domains/subtitles/actions');
+const { runInPlaceActions } = require('./media_optimizer/pipeline/actions');
 const { resolveOriginalLanguage } = require('./media_optimizer/integrations/arr_original_language');
 const { analyzeFile, summarizeAnalysis } = require('./media_optimizer/pipeline/analyze');
 const { buildProcessingPlan } = require('./media_optimizer/pipeline/plan');
@@ -133,7 +133,7 @@ function details() {
         tooltip: `
           Select the metadata cleanup policy.\\n
           Clean: strips global tags, removes file/video titles, removes extra tag tracks, preserves font attachments, removes non-font attachments, and keeps or creates chapters.\\n
-          Preserve: keeps the available source metadata, tags, titles, attachments, and chapter layout when possible.\\n
+          Preserve: keeps the available source metadata, tags, titles, and chapter layout. Font attachments are retained for subtitles; non-font attachments are removed.\\n
           Chapter handling uses existing MediaInfo Menu/@type chapter data when present. If no chapters exist and Clean is selected, generated chapter markers can be added.\\n
           Example: Clean removes noisy release tags and non-font attachments while preserving ASS/SSA font attachments needed for styled subtitles.
         `,
@@ -273,7 +273,7 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
 
   context.plan.command = buildFfmpegCommand(context);
   context.plan.ffmpegArgs = context.plan.command.args;
-  runSubtitleActions(context);
+  runInPlaceActions(context);
 
   if (context.settings.logLevel === 'summary') {
     context.log.section('Compliance summary');

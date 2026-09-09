@@ -54,7 +54,6 @@ function normalizeAttachmentStream(stream) {
   const isFont = isFontAttachment(extension, mimeType);
   const isImage = isImageAttachment(extension, mimeType, codecName);
   const attachmentType = getAttachmentType({ isFont, isImage });
-  const reasons = getAttachmentAnalysisReasons({ attachmentType, extension, mimeType, codecName });
 
   return {
     sourceIndex: stream?.index,
@@ -65,9 +64,6 @@ function normalizeAttachmentStream(stream) {
     attachmentType,
     isFont,
     isImage,
-    isLikelySubtitleFont: isFont,
-    reasons,
-    rawStream: stream,
   };
 }
 
@@ -127,22 +123,6 @@ function getAttachmentType({ isFont, isImage }) {
   }
 
   return 'other';
-}
-
-function getAttachmentAnalysisReasons({ attachmentType, extension, mimeType, codecName }) {
-  const reasons = [];
-
-  if (attachmentType === 'font') {
-    reasons.push('Attachment is classified as a font from its filename extension or MIME type.');
-  } else if (attachmentType === 'image') {
-    reasons.push('Attachment is classified as image or artwork content.');
-  } else if (!extension && !mimeType && !codecName) {
-    reasons.push('Attachment type is unknown because filename, MIME type, and codec name are missing.');
-  } else {
-    reasons.push('Attachment is not classified as a font attachment.');
-  }
-
-  return reasons;
 }
 
 module.exports = {

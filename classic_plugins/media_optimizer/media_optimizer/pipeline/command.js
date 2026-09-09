@@ -33,7 +33,11 @@ function buildFfmpegCommand(context) {
   outputArgs.push(...subtitleCommand.outputArgs);
   addAttachmentArgs(outputArgs, plan.attachments, streamIndexes);
   addChapterArgs(outputArgs, plan.chapters, chapterInputs.chapterInput, unsupportedSteps);
-  addMetadataArgs(outputArgs, plan, streamIndexes, warnings, unsupportedSteps);
+  addMetadataArgs(outputArgs, plan, warnings, unsupportedSteps);
+
+  if (streamIndexes.video === 0 || streamIndexes.audio === 0) {
+    warnings.push('Command preview has no mapped video or audio stream; plan validation should normally prevent execution.');
+  }
 
   outputArgs.push('-max_muxing_queue_size', '9999');
 

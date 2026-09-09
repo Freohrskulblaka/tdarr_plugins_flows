@@ -7,19 +7,6 @@
  * - 2026-08-05 - Freohrskulblaka: Repair forced subtitle flags to the planned state during no-op passes.
  */
 
-function runSubtitleActions(context) {
-  const shouldRunActions = context.plan?.isValid
-    && !context.plan?.shouldProcess
-    && !context.settings.dryRun;
-
-  if (!shouldRunActions) {
-    return;
-  }
-
-  cleanupMatchedExternalSubtitleSidecars(context);
-  repairSubtitleMetadata(context);
-}
-
 function cleanupMatchedExternalSubtitleSidecars(context) {
   const matchedSidecars = context.plan?.subtitles?.matchedExternalSubtitles || [];
 
@@ -59,28 +46,13 @@ function cleanupMatchedExternalSubtitleSidecars(context) {
   }
 }
 
-function repairSubtitleMetadata(context) {
+function addSubtitleMkvpropeditActions(context, args) {
   const subtitleTracks = context.plan?.subtitles?.tracks || [];
   const subtitleUpdates = subtitleTracks.filter((track) => {
     const dispositionChanged = track.default !== track.currentDefault || track.forced !== track.currentForced;
     return track.sourceKind === 'embedded' && (track.titleNeedsUpdate || dispositionChanged);
   });
-  const shouldRepair = context.plan?.container?.targetContainer === 'mkv'
-    && context.analysis?.file?.container === 'mkv'
-    && subtitleUpdates.length > 0;
 
-  if (!shouldRepair) {
-    return;
-  }
-
-  const filePath = context.file?._id || context.file?.file;
-
-  if (!filePath) {
-    context.log.warn('Unable to repair subtitle metadata because the file path is missing.');
-    return;
-  }
-
-  const args = [filePath];
   subtitleUpdates.forEach((track) => {
     const changes = [
       track.titleNeedsUpdate && `name=${track.title}`,
@@ -95,30 +67,15 @@ function repairSubtitleMetadata(context) {
     );
   });
 
-  const proc = require('child_process');
-
-  try {
-    const runner = context.otherArguments?.mediaOptimizerCommandRunner;
-
-    if (typeof runner === 'function') {
-      runner('mkvpropedit', args);
-    } else {
-      proc.execFileSync('mkvpropedit', args, { stdio: 'pipe' });
-    }
-
-    context.log.info('Repaired subtitle metadata in place with mkvpropedit', subtitleUpdates.map((track) => ({
-      subtitleIndex: track.sourceOrder,
-      title: track.title,
-      default: track.default,
-      forced: track.forced,
-    })));
-  } catch (error) {
-    context.log.warn('Unable to repair subtitle metadata in place with mkvpropedit', {
-      error: error.message,
-    });
-  }
+  return subtitleUpdates.map((track) => ({
+    subtitleIndex: track.sourceOrder,
+    title: track.title,
+    default: track.default,
+    forced: track.forced,
+  }));
 }
 
 module.exports = {
-  runSubtitleActions,
+  addSubtitleMkvpropeditActions,
+  cleanupMatchedExternalSubtitleSidecars,
 };

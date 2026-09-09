@@ -9,7 +9,7 @@
 
 const { findOutputIndex, quoteArg } = require('../../utils/command_args');
 
-function addMetadataArgs(args, plan, streamIndexes, warnings, unsupportedSteps) {
+function addMetadataArgs(args, plan, warnings, unsupportedSteps) {
   const metadataPlan = plan.metadata || {};
 
   if (metadataPlan.stripGlobalTags) {
@@ -30,16 +30,14 @@ function addMetadataArgs(args, plan, streamIndexes, warnings, unsupportedSteps) 
     }
   });
 
-  if ((metadataPlan.extraTagTracks || []).some((track) => track.action === 'remove')) {
-    unsupportedSteps.push('Extra tag/data stream cleanup is planned by omitting mapped streams; verify with output inspection before enabling processing.');
-  }
+  const hasExtraTagTracks = (metadataPlan.extraTagTracks || []).length > 0;
 
-  if ((plan.attachments?.removedTracks || []).length > 0) {
-    warnings.push('Removed attachments are omitted from the output maps; confirm FFmpeg preserves desired font attachments and drops only planned non-font attachments.');
-  }
-
-  if (streamIndexes.video === 0 || streamIndexes.audio === 0) {
-    warnings.push('Command preview has no mapped video or audio stream; plan validation should normally prevent execution.');
+  if (hasExtraTagTracks) {
+    if (metadataPlan.removeExtraTagStreams) {
+      warnings.push('Removed extra tag/data streams are omitted from the output maps.');
+    } else {
+      unsupportedSteps.push('Preserving extra tag/data streams is not supported because the target MKV may not accept their codecs.');
+    }
   }
 }
 
