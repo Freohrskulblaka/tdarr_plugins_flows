@@ -23,8 +23,7 @@ function planSubtitles(context) {
   const preserveExistingTitles = Boolean(context.analysis.streams.subtitle.preserveExistingTitles);
   const embeddedTracks = embeddedSubtitles.map((subtitle) => createSubtitleTrack(subtitle, preserveExistingTitles));
   const externalDiscovery = discoverExternalSubtitleImports(context, embeddedTracks, languageOrder, preserveExistingTitles);
-  const externalTracks = externalDiscovery.imports;
-  const candidateTracks = [...embeddedTracks, ...externalTracks];
+  const candidateTracks = [...embeddedTracks, ...externalDiscovery.imports];
   const keptTracks = selectSubtitleTracks(candidateTracks, context, languageOrder);
   const removedTracks = candidateTracks.filter((track) => track.action === 'remove');
   const outputTracks = assignSubtitleOutputIndexes(orderSubtitleTracks(keptTracks, context, languageOrder));
@@ -150,7 +149,7 @@ function orderSubtitleTracks(tracks, context, languageOrder) {
 
 function assignSubtitleOutputIndexes(tracks) {
   return tracks.map((track, index) => {
-    const defaultReason = index === 0 && !track.currentDefault ? 'Subtitle track will be set as the default subtitle track.' :  index > 0 && track.currentDefault ? 'Subtitle default flag will be disabled.' : '';
+    const defaultReason = index === 0 && !track.currentDefault ? 'Subtitle track will be set as the default subtitle track.' : index > 0 && track.currentDefault ? 'Subtitle default flag will be disabled.' : '';
     const forcedReason = track.forced && !track.currentForced ? 'Subtitle forced flag will be enabled.' : !track.forced && track.currentForced ? 'Subtitle forced flag will be disabled.' : '';
 
     const reasons = [
@@ -173,9 +172,8 @@ function assignSubtitleOutputIndexes(tracks) {
 
 function discoverExternalSubtitleImports(context, embeddedSubtitleTracks, languageOrder, preserveExistingTitles) {
   const discovery = {imports: [], matchedExternalSubtitles: []};
-  const shouldImport = context.settings.subtitle.importExternalSubtitles;
 
-  if (!shouldImport) {
+  if (!context.settings.subtitle.importExternalSubtitles) {
     return discovery;
   }
 

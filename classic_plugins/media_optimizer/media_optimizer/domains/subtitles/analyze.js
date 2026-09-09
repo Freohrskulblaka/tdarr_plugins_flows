@@ -38,9 +38,8 @@ function analyzeSubtitles(streams, mediaInfoTracks, fileInfo) {
   const subtitleTitleText = [fileInfo.id, fileInfo.directory, fileInfo.nameNoExtension].join(' ').toLowerCase();
   embedded.preserveExistingTitles = subtitleTitleText.includes('anime');
   const external = analyzeExternalSubtitleFiles(fileInfo);
-  const subtitleAnalysis = {embedded, external};
 
-  return subtitleAnalysis;
+  return {embedded, external};
 }
 
 function analyzeEmbeddedSubtitleStreams(subtitleStreams, mediaInfoTracks) {
@@ -104,37 +103,6 @@ function analyzeExternalSubtitleFiles(fileInfo) {
     return normalizedValue;
   };
 
-  const detectExternalLanguage = (suffix) => {
-    const suffixParts = suffix.split(/[^a-z0-9]+/);
-    const language = Object.keys(SUBTITLE_LANGUAGE_FILE_TOKENS).reduce((matchedLanguage, token) => {
-      if (matchedLanguage) {
-        return matchedLanguage;
-      }
-
-      const hasLanguageToken = suffixParts.includes(token);
-
-      return hasLanguageToken ? SUBTITLE_LANGUAGE_FILE_TOKENS[token] : '';
-    }, '') || 'und';
-
-    return language;
-  };
-
-  const countTextSubtitleCues = (filePath, format) => {
-    if (format.subtitleType !== 'text') {
-      return null;
-    }
-
-    const subtitleText = fs.readFileSync(filePath, 'utf8');
-
-    if (format.codec === 'ass' || format.codec === 'ssa') {
-      const dialogueLines = subtitleText.match(/^Dialogue:/gm);
-      return dialogueLines ? dialogueLines.length : null;
-    }
-
-    const timestampLines = subtitleText.match(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}[,.]\d{3}/g);
-    return timestampLines ? timestampLines.length : null;
-  };
-
   const mediaName = normalizeExternalSubtitleName(fileInfo.nameNoExtension);
   const fileNames = fs.readdirSync(directory);
   const externalSubtitles = [];
@@ -158,10 +126,21 @@ function analyzeExternalSubtitleFiles(fileInfo) {
     try {
       const sourcePath = path.join(directory, fileName);
       const suffix = normalizedBaseName === mediaName ? '' : normalizedBaseName.slice(mediaName.length + 1);
-      const language = detectExternalLanguage(suffix);
+      const suffixParts = suffix.split(/[^a-z0-9]+/);
+      const languageToken = Object.keys(SUBTITLE_LANGUAGE_FILE_TOKENS).find((token) => suffixParts.includes(token));
+      const language = SUBTITLE_LANGUAGE_FILE_TOKENS[languageToken] || 'und';
       const languageVariant = detectLanguageVariant(language, [language], [baseName]);
       const streamSize = fs.statSync(sourcePath).size;
-      const cueCount = countTextSubtitleCues(sourcePath, format);
+      let cueCount = null;
+
+      if (format.subtitleType === 'text') {
+        const subtitleText = fs.readFileSync(sourcePath, 'utf8');
+        const cueLines = format.codec === 'ass' || format.codec === 'ssa'
+          ? subtitleText.match(/^Dialogue:/gm)
+          : subtitleText.match(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}[,.]\d{3}/g);
+        cueCount = cueLines ? cueLines.length : null;
+      }
+
       const isEmpty = streamSize === 0;
       const textIntent = detectSubtitleTextIntent({title: baseName});
       const externalSubtitle = {
@@ -186,7 +165,8 @@ function createSubtitleInfo(subtitles) {
   const languages = getUniqueValues(subtitles, (subtitle) => subtitle.language);
   const codecs = getUniqueValues(subtitles, (subtitle) => subtitle.codec);
   const subtitleTypes = getUniqueValues(subtitles, (subtitle) => subtitle.subtitleType);
-  const subtitleInfo = {
+
+  return {
     items: subtitles,
     count: subtitles.length,
     hasStreams: subtitles.length > 0,
@@ -197,8 +177,6 @@ function createSubtitleInfo(subtitles) {
     codecs,
     subtitleTypes,
   };
-
-  return subtitleInfo;
 }
 
 function detectSubtitleTextIntent({stream, title}) {
@@ -209,9 +187,8 @@ function detectSubtitleTextIntent({stream, title}) {
   const hasForcedTitle = /\bforced\b|\bforeign[ -]?only\b|\bsigns?[ &-]?songs?\b/.test(normalizedTitle);
   const hasAccessibility = disposition.hearing_impaired || disposition.captions;
   const accessibility = hasAccessibility ? 'CC' : hasSdhTitle ? 'SDH' : hasClosedCaptionTitle ? 'CC' : 'regular';
-  const textIntent = {accessibility, forced: hasForcedTitle, titleIndicatesForced: hasForcedTitle};
 
-  return textIntent;
+  return {accessibility, forced: hasForcedTitle};
 }
 
 module.exports = {

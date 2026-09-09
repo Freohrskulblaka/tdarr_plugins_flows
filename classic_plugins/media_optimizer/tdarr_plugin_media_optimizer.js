@@ -162,7 +162,7 @@ function details() {
           Use ISO-639-2/B three-letter language codes.\\n
           Subtitles are retained and ordered using this list plus the selected subtitle profile.\\n
           Include Original Language adds the resolved original language to subtitle retention.\\n
-          Example: eng,spa keeps English and Spanish subtitle tracks and imports matching English/Spanish subtitle sidecars.\\n
+          Example: eng,spa keeps English and Spanish subtitle tracks and imports matching English/Spanish subtitle sidecars such as SRT, ASS, VTT, or SUP.\\n
           Example: eng keeps only English subtitles unless Include Original Language adds another language.
         `,
       },

@@ -8,18 +8,22 @@
  */
 
 function runSubtitleActions(context) {
+  const shouldRunActions = context.plan?.isValid
+    && !context.plan?.shouldProcess
+    && !context.settings.dryRun;
+
+  if (!shouldRunActions) {
+    return;
+  }
+
   cleanupMatchedExternalSubtitleSidecars(context);
   repairSubtitleDispositions(context);
 }
 
 function cleanupMatchedExternalSubtitleSidecars(context) {
   const matchedSidecars = context.plan?.subtitles?.matchedExternalSubtitles || [];
-  const shouldClean = context.plan?.isValid
-    && !context.plan?.shouldProcess
-    && !context.settings.dryRun
-    && matchedSidecars.length > 0;
 
-  if (!shouldClean) {
+  if (matchedSidecars.length === 0) {
     return;
   }
 
@@ -57,13 +61,11 @@ function cleanupMatchedExternalSubtitleSidecars(context) {
 
 function repairSubtitleDispositions(context) {
   const subtitleTracks = context.plan?.subtitles?.tracks || [];
-  const dispositionUpdates = subtitleTracks
-    .filter((track) => track.sourceKind === 'embedded')
-    .filter((track) => track.default !== track.currentDefault || track.forced !== track.currentForced);
-  const shouldRepair = context.plan?.isValid
-    && !context.plan?.shouldProcess
-    && !context.settings.dryRun
-    && context.plan?.container?.targetContainer === 'mkv'
+  const dispositionUpdates = subtitleTracks.filter((track) => {
+    const dispositionChanged = track.default !== track.currentDefault || track.forced !== track.currentForced;
+    return track.sourceKind === 'embedded' && dispositionChanged;
+  });
+  const shouldRepair = context.plan?.container?.targetContainer === 'mkv'
     && context.analysis?.file?.container === 'mkv'
     && dispositionUpdates.length > 0;
 
@@ -114,7 +116,5 @@ function repairSubtitleDispositions(context) {
 }
 
 module.exports = {
-  cleanupMatchedExternalSubtitleSidecars,
-  repairSubtitleDispositions,
   runSubtitleActions,
 };

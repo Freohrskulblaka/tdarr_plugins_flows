@@ -11,65 +11,46 @@
 
 const { addDisposition, addStreamMetadata, quoteArg } = require('../../utils/command_args');
 
-function addExternalSubtitleInputs(subtitlePlan, inputArgs, startingInputIndex) {
+function buildSubtitleCommandArgs(subtitlePlan, streamIndexes, startingInputIndex) {
+  const inputArgs = [];
+  const outputArgs = [];
   const externalSubtitleInputs = new Map();
   let nextInputIndex = startingInputIndex;
-
-  (subtitlePlan?.tracks || []).forEach((track) => {
-    if (track.sourceKind !== 'external' || externalSubtitleInputs.has(track.sourcePath)) {
-      return;
-    }
-
-    if (track.textEncoding) {
-      inputArgs.push('-sub_charenc', quoteArg('UTF-8'));
-    }
-
-    if (track.inputFormat) {
-      inputArgs.push('-f', track.inputFormat);
-    }
-
-    inputArgs.push('-i', quoteArg(track.sourcePath));
-    externalSubtitleInputs.set(track.sourcePath, nextInputIndex);
-    nextInputIndex += 1;
-  });
-
-  return {
-    inputs: externalSubtitleInputs,
-    nextInputIndex,
-  };
-}
-
-function addSubtitleArgs(args, subtitlePlan, streamIndexes, externalSubtitleInputs) {
   const shouldApplyDispositions = subtitlePlan?.shouldProcess === true;
 
   (subtitlePlan?.tracks || []).forEach((track) => {
-    const outputIndex = streamIndexes.subtitle;
+    const isExternal = track.sourceKind === 'external';
 
-    if (track.sourceKind === 'external') {
-      const inputIndex = externalSubtitleInputs.get(track.sourcePath);
-      args.push('-map', `${inputIndex}:0`);
-      args.push(`-c:s:${outputIndex}`, 'copy');
-      addStreamMetadata(args, 's', outputIndex, {
-        language: track.language,
-        title: track.title,
-      });
-    } else {
-      args.push('-map', `0:${track.sourceIndex}`);
-      args.push(`-c:s:${outputIndex}`, 'copy');
+    if (isExternal && !externalSubtitleInputs.has(track.sourcePath)) {
+      const inputOptions = [
+        track.textEncoding && ['-sub_charenc', quoteArg('UTF-8')],
+        track.inputFormat && ['-f', track.inputFormat],
+      ].filter(Boolean).flat();
+
+      inputArgs.push(...inputOptions, '-i', quoteArg(track.sourcePath));
+      externalSubtitleInputs.set(track.sourcePath, nextInputIndex);
+      nextInputIndex += 1;
+    }
+
+    const outputIndex = streamIndexes.subtitle;
+    const inputSpecifier = isExternal ? `${externalSubtitleInputs.get(track.sourcePath)}:0` : `0:${track.sourceIndex}`;
+
+    outputArgs.push('-map', inputSpecifier, `-c:s:${outputIndex}`, 'copy');
+
+    if (isExternal) {
+      addStreamMetadata(outputArgs, 's', outputIndex, { language: track.language, title: track.title });
     }
 
     if (shouldApplyDispositions) {
-      addDisposition(args, 's', outputIndex, {
-        default: track.default,
-        forced: track.forced,
-      });
+      addDisposition(outputArgs, 's', outputIndex, { default: track.default, forced: track.forced });
     }
 
     streamIndexes.subtitle += 1;
   });
+
+  return {inputArgs, outputArgs, nextInputIndex};
 }
 
 module.exports = {
-  addExternalSubtitleInputs,
-  addSubtitleArgs,
+  buildSubtitleCommandArgs,
 };

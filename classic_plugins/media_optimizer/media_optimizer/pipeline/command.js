@@ -9,7 +9,7 @@ const { addAttachmentArgs } = require('../domains/attachments/command');
 const { addAudioArgs } = require('../domains/audio/command');
 const { addChapterArgs, addGeneratedChapterInput } = require('../domains/chapters/command');
 const { addMetadataArgs } = require('../domains/metadata/command');
-const { addExternalSubtitleInputs, addSubtitleArgs } = require('../domains/subtitles/command');
+const { buildSubtitleCommandArgs } = require('../domains/subtitles/command');
 const { addVideoArgs } = require('../domains/video/command');
 
 function buildFfmpegCommand(context) {
@@ -24,12 +24,13 @@ function buildFfmpegCommand(context) {
     subtitle: 0,
     attachment: 0,
   };
-  const subtitleInputs = addExternalSubtitleInputs(plan.subtitles, inputArgs, 1);
-  const chapterInputs = addGeneratedChapterInput(context, plan.chapters, inputArgs, subtitleInputs.nextInputIndex);
+  const subtitleCommand = buildSubtitleCommandArgs(plan.subtitles, streamIndexes, 1);
+  inputArgs.push(...subtitleCommand.inputArgs);
+  const chapterInputs = addGeneratedChapterInput(context, plan.chapters, inputArgs, subtitleCommand.nextInputIndex);
 
   addVideoArgs(outputArgs, plan.video, streamIndexes);
   addAudioArgs(outputArgs, plan.audio, streamIndexes);
-  addSubtitleArgs(outputArgs, plan.subtitles, streamIndexes, subtitleInputs.inputs);
+  outputArgs.push(...subtitleCommand.outputArgs);
   addAttachmentArgs(outputArgs, plan.attachments, streamIndexes);
   addChapterArgs(outputArgs, plan.chapters, chapterInputs.chapterInput, unsupportedSteps);
   addMetadataArgs(outputArgs, plan, streamIndexes, warnings, unsupportedSteps);

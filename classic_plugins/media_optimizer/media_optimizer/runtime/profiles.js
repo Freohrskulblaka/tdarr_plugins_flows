@@ -37,10 +37,10 @@ const AUDIO_PROFILES = {
 };
 
 const SUBTITLE_PROFILES = {
-  'Picture First + Text': { includeOriginalLanguage: false, pictureFirst: true, importExternalSrt: true },
-  'Include Original Language': { includeOriginalLanguage: true, pictureFirst: true, importExternalSrt: true },
-  'Text First': { includeOriginalLanguage: false, pictureFirst: false, importExternalSrt: true },
-  'Text Only': { includeOriginalLanguage: false, pictureFirst: false, importExternalSrt: false, textOnly: true },
+  'Picture First + Text': { includeOriginalLanguage: false, pictureFirst: true, importExternalSubtitles: true },
+  'Include Original Language': { includeOriginalLanguage: true, pictureFirst: true, importExternalSubtitles: true },
+  'Text First': { includeOriginalLanguage: false, pictureFirst: false, importExternalSubtitles: true },
+  'Text Only': { includeOriginalLanguage: false, pictureFirst: false, importExternalSubtitles: false, textOnly: true },
 };
 
 const METADATA_PROFILES = {
