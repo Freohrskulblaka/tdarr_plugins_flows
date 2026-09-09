@@ -10,40 +10,17 @@
  * - 2026-07-15 - Freohrskulblaka: Normalized attachment filenames, MIME types, extensions, and type classification.
  */
 
-const { getUniqueValues } = require('../../utils/analysis');
-
-const FONT_EXTENSIONS = ['.ttf', '.otf', '.ttc', '.woff', '.woff2'];
-const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
-
-const FONT_MIME_TYPES = [
-  'font/ttf',
-  'font/otf',
-  'font/collection',
-  'font/woff',
-  'font/woff2',
-  'application/x-truetype-font',
-  'application/vnd.ms-opentype',
-  'application/font-woff',
-  'application/font-woff2',
-  'application/x-font-ttf',
-  'application/x-font-otf',
-  'application/x-font-opentype',
-];
+const FONT_FORMATS = ['ttf', 'otf', 'ttc', 'woff', 'woff2'];
+const FONT_MIME_TYPES = ['font/ttf', 'font/otf', 'font/collection', 'font/woff', 'font/woff2', 'application/x-truetype-font', 'application/vnd.ms-opentype', 'application/font-woff', 'application/font-woff2', 'application/x-font-ttf', 'application/x-font-otf', 'application/x-font-opentype'];
 
 function analyzeAttachmentStreams(attachmentStreams) {
   const items = attachmentStreams.map(normalizeAttachmentStream);
 
-  const attachmentInfo = {
+  return {
     items,
     count: items.length,
     hasAttachments: items.length > 0,
-    fontCount: items.filter((item) => item.isFont).length,
-    nonFontCount: items.filter((item) => !item.isFont).length,
-    imageCount: items.filter((item) => item.isImage).length,
-    mimeTypes: getUniqueValues(items, (item) => item.mimeType || item.codecName || 'unknown'),
   };
-
-  return attachmentInfo;
 }
 
 function normalizeAttachmentStream(stream) {
@@ -51,9 +28,6 @@ function normalizeAttachmentStream(stream) {
   const mimeType = normalizeValue(getTagValue(stream, ['mimetype', 'MIMETYPE', 'mime_type', 'MIME_TYPE']));
   const codecName = normalizeValue(stream?.codec_name);
   const extension = getFileExtension(fileName);
-  const isFont = isFontAttachment(extension, mimeType);
-  const isImage = isImageAttachment(extension, mimeType, codecName);
-  const attachmentType = getAttachmentType({ isFont, isImage });
 
   return {
     sourceIndex: stream?.index,
@@ -61,9 +35,7 @@ function normalizeAttachmentStream(stream) {
     mimeType,
     codecName,
     extension,
-    attachmentType,
-    isFont,
-    isImage,
+    isFont: isFontAttachment(extension, mimeType, codecName),
   };
 }
 
@@ -89,40 +61,11 @@ function getFileExtension(fileName) {
   return match ? match[1] : '';
 }
 
-function isFontAttachment(extension, mimeType) {
-  if (FONT_EXTENSIONS.includes(extension)) {
-    return true;
-  }
-
-  if (FONT_MIME_TYPES.includes(mimeType)) {
-    return true;
-  }
-
-  return mimeType.startsWith('font/');
-}
-
-function isImageAttachment(extension, mimeType, codecName) {
-  if (IMAGE_EXTENSIONS.includes(extension)) {
-    return true;
-  }
-
-  if (mimeType.startsWith('image/')) {
-    return true;
-  }
-
-  return ['mjpeg', 'png', 'gif', 'webp', 'bmp'].includes(codecName);
-}
-
-function getAttachmentType({ isFont, isImage }) {
-  if (isFont) {
-    return 'font';
-  }
-
-  if (isImage) {
-    return 'image';
-  }
-
-  return 'other';
+function isFontAttachment(extension, mimeType, codecName) {
+  return FONT_FORMATS.includes(extension.slice(1))
+    || FONT_MIME_TYPES.includes(mimeType)
+    || mimeType.startsWith('font/')
+    || FONT_FORMATS.includes(codecName);
 }
 
 module.exports = {

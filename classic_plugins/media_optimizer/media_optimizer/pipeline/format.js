@@ -136,7 +136,7 @@ function summarizeAttachments(attachmentPlan) {
     return 'none';
   }
 
-  return `keeping ${attachmentPlan.keptCount}, removing ${attachmentPlan.removedCount}, fonts ${attachmentPlan.fontCount}`;
+  return `keeping ${attachmentPlan.keptCount} subtitle fonts, removing ${attachmentPlan.removedCount} non-font attachments`;
 }
 
 function summarizeChapters(chapterPlan) {
@@ -236,11 +236,13 @@ function renderAttachments(lines, attachmentPlan) {
     return;
   }
 
-  lines.push(`  kept=${attachmentPlan.keptCount} removed=${attachmentPlan.removedCount} fonts=${attachmentPlan.fontCount} nonFonts=${attachmentPlan.nonFontCount}`);
+  lines.push(`  keeping ${attachmentPlan.keptCount} subtitle fonts; removing ${attachmentPlan.removedCount} non-font attachments`);
 
-  attachmentPlan.tracks.forEach((track) => {
-    lines.push(`  src=${track.sourceIndex} action=${track.action} font=${track.isFont ? 'yes' : 'no'} name="${track.fileName}" mime="${track.mimeType}"`);
-  });
+  attachmentPlan.tracks
+    .filter((track) => track.action === 'remove')
+    .forEach((track) => {
+      lines.push(`  remove src=${track.sourceIndex} name="${track.fileName}" mime="${track.mimeType || track.codecName || 'unknown'}"`);
+    });
 }
 
 function renderChapters(lines, chapterPlan) {
