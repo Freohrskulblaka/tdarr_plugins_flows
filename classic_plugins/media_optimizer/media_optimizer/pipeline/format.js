@@ -140,6 +140,10 @@ function summarizeAttachments(attachmentPlan) {
 }
 
 function summarizeChapters(chapterPlan) {
+  if (chapterPlan.evidenceOnly) {
+    return `keep detected chapter source${chapterPlan.source ? ` (${chapterPlan.source})` : ''}`;
+  }
+
   const count = getChapterDisplayCount(chapterPlan);
   const detail = count === 1 ? 'chapter marker source' : 'chapter markers';
 
@@ -248,6 +252,13 @@ function renderAttachments(lines, attachmentPlan) {
 function renderChapters(lines, chapterPlan) {
   const details = [];
   const chapterCount = getChapterDisplayCount(chapterPlan);
+
+  if (chapterPlan.evidenceOnly) {
+    const source = chapterPlan.source ? ` source="${chapterPlan.source}"` : '';
+
+    lines.push(`Chapters: keep (detected source)${source}`);
+    return;
+  }
 
   if (chapterPlan.durationSeconds > 0) {
     details.push(`duration=${Math.floor(chapterPlan.durationSeconds)}s`);

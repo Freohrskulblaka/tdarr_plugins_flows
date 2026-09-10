@@ -8,119 +8,81 @@
  *   - Extracted chapter planning from the planning coordinator and modeled generated chapter markers.
  *   - Added media-type-aware generated chapter count bounds.
  * - 2026-07-15 - Freohrskulblaka: Skipped generated chapter planning when duration is unavailable.
- * - 2026-07-21 - Freohrskulblaka: Included the final end-of-file chapter marker in generated chapter counts.
+ * - 2026-09-09 - Freohrskulblaka: Generated complete interval markers without a redundant end-of-file marker.
  * - 2026-08-04 - Freohrskulblaka: Prevent repeated generated-chapter remuxing on Tdarr cache outputs.
  */
 
 const DEFAULT_CHAPTER_INTERVAL_SECONDS = 300;
-const MIN_GENERATED_CHAPTER_COUNT = 2;
-const MAX_EPISODE_CHAPTER_COUNT = 12;
-const MAX_MOVIE_CHAPTER_COUNT = 30;
+const MAX_GENERATED_CHAPTER_COUNTS = {'TV Show': 12, Movie: 30};
 
 function planChapters(context) {
-  const existingChapters = context.analysis.chapters || [];
-  const hasChapters = existingChapters.length > 0;
-  const durationSeconds = getDurationSeconds(context);
+  const chapterAnalysis = context.analysis.chapters;
+  const existingChapters = chapterAnalysis.items;
+  const durationSeconds = context.analysis.file.durationSeconds;
+  const mediaType = context.analysis.media?.type || 'Unknown';
+  const basePlan = {
+    action: 'skip',
+    count: 0,
+    existingCount: existingChapters.length,
+    generatedCount: 0,
+    durationSeconds,
+    intervalSeconds: null,
+    mediaType,
+    markers: [],
+    source: chapterAnalysis.source,
+    evidenceOnly: chapterAnalysis.evidenceOnly,
+    shouldProcess: false,
+    reasons: [],
+  };
 
-  if (hasChapters) {
+  if (chapterAnalysis.hasChapters) {
     return {
+      ...basePlan,
       action: 'keep',
-      count: existingChapters.length,
-      existingCount: existingChapters.length,
-      generatedCount: 0,
-      durationSeconds,
-      intervalSeconds: null,
-      shouldProcess: false,
-      reasons: [],
+      count: chapterAnalysis.count,
     };
   }
 
-  const mediaType = context.analysis.media?.type || 'Unknown';
-
-  if (isTdarrCacheOutput(context)) {
+  if (!context.settings.metadata.generateMissingChapters) {
     return {
-      action: 'skip',
-      count: 0,
-      existingCount: 0,
-      generatedCount: 0,
-      durationSeconds,
-      intervalSeconds: null,
-      mediaType,
-      shouldProcess: false,
+      ...basePlan,
+      reasons: ['No chapters were detected; the selected metadata profile does not generate chapter markers.'],
+    };
+  }
+
+  if (context.analysis.file.isTdarrCacheOutput) {
+    return {
+      ...basePlan,
       reasons: ['No chapters were detected on a Tdarr cache output; generated chapter markers will not be re-applied.'],
     };
   }
 
   if (durationSeconds <= 0) {
     return {
-      action: 'skip',
-      count: 0,
-      existingCount: 0,
-      generatedCount: 0,
-      durationSeconds,
-      intervalSeconds: null,
-      mediaType,
-      shouldProcess: false,
+      ...basePlan,
       reasons: ['No chapters were detected, but duration is unavailable; generated chapter markers will be skipped.'],
     };
   }
 
-  const generatedCount = estimateGeneratedChapterCount(durationSeconds, DEFAULT_CHAPTER_INTERVAL_SECONDS, mediaType);
-  const reasons = ['No chapters were detected; generated chapter markers will be added.'];
+  const intervalCount = Math.ceil(durationSeconds / DEFAULT_CHAPTER_INTERVAL_SECONDS);
+  const maximumCount = MAX_GENERATED_CHAPTER_COUNTS[mediaType] || intervalCount;
+  const generatedCount = Math.min(maximumCount, intervalCount);
+  const markers = Array.from({length: generatedCount}, (_, index) => {
+    return generatedCount < intervalCount
+      ? Math.floor((durationSeconds * index) / generatedCount)
+      : index * DEFAULT_CHAPTER_INTERVAL_SECONDS;
+  });
 
   return {
+    ...basePlan,
     action: 'add',
     count: generatedCount,
-    existingCount: 0,
     generatedCount,
-    durationSeconds,
-    intervalSeconds: DEFAULT_CHAPTER_INTERVAL_SECONDS,
-    mediaType,
+    intervalSeconds: markers.length > 1 ? markers[1] - markers[0] : null,
+    markers,
     shouldProcess: true,
-    reasons,
+    reasons: ['No chapters were detected; generated chapter markers will be added.'],
   };
-}
-
-function isTdarrCacheOutput(context) {
-  const fileId = context.analysis?.file?.id || context.file?._id || context.file?.file || '';
-
-  return String(fileId).includes('TdarrCacheFile');
-}
-
-function getDurationSeconds(context) {
-  const file = context.file || {};
-  const duration = file.mediaInfo?.format?.duration
-    || file.mediaInfo?.format?.Duration
-    || file.meta?.Duration
-    || file.duration
-    || 0;
-  const durationSeconds = Number(duration);
-
-  return Number.isFinite(durationSeconds) ? durationSeconds : 0;
-}
-
-function estimateGeneratedChapterCount(durationSeconds, intervalSeconds, mediaType) {
-  if (durationSeconds <= 0 || intervalSeconds <= 0) {
-    return 0;
-  }
-
-  const intervalCount = Math.ceil(durationSeconds / intervalSeconds) + 1;
-  const boundedMinimumCount = Math.max(MIN_GENERATED_CHAPTER_COUNT, intervalCount);
-  const maximumCount = getMaximumGeneratedChapterCount(mediaType);
-
-  return maximumCount ? Math.min(maximumCount, boundedMinimumCount) : boundedMinimumCount;
-}
-
-function getMaximumGeneratedChapterCount(mediaType) {
-  if (mediaType === 'TV Show') {
-    return MAX_EPISODE_CHAPTER_COUNT;
-  }
-
-  if (mediaType === 'Movie') {
-    return MAX_MOVIE_CHAPTER_COUNT;
-  }
-
-  return null;
 }
 
 module.exports = {

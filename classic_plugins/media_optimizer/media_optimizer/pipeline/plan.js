@@ -95,7 +95,7 @@ function validateRequiredStreams(context) {
 function planContainer(context) {
   const reasons = [];
   const shouldRemux = context.analysis.file.needsRemux;
-  const isCacheOutput = isTdarrCacheOutput(context);
+  const isCacheOutput = context.analysis.file.isTdarrCacheOutput;
   const useGenpts = Boolean(context.analysis.file.useGenpts && shouldRemux && !isCacheOutput);
 
   if (shouldRemux) {
@@ -120,14 +120,6 @@ function planContainer(context) {
   };
 
   return containerPlan;
-}
-
-function isTdarrCacheOutput(context) {
-  return [
-    context.analysis?.file?.id,
-    context.file?._id,
-    context.file?.file,
-  ].some((value) => String(value || '').includes('TdarrCacheFile'));
 }
 
 function collectPlanReasons(sections) {

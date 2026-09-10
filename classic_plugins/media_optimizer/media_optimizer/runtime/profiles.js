@@ -46,8 +46,8 @@ const SUBTITLE_PROFILES = {
 };
 
 const METADATA_PROFILES = {
-  Clean: {stripGlobalTags: true, removeExtraTagStreams: true, removeFileTitle: true, removeVideoTitles: true},
-  Preserve: {stripGlobalTags: false, removeExtraTagStreams: false, removeFileTitle: false, removeVideoTitles: false},
+  Clean: {stripGlobalTags: true, removeExtraTagStreams: true, removeFileTitle: true, removeVideoTitles: true, generateMissingChapters: true},
+  Preserve: {stripGlobalTags: false, removeExtraTagStreams: false, removeFileTitle: false, removeVideoTitles: false, generateMissingChapters: false},
 };
 
 function createProfileConfig(inputs) {

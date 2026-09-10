@@ -29,7 +29,7 @@ function analyzeFile(context) {
   const fileInfo = analyzeFileInfo(context.file, context.settings);
   const subtitleInfo = analyzeSubtitles(streams, mediaInfoTracks, fileInfo);
   const streamInfo = analyzeStreams(streams, mediaInfoTracks, context.file, subtitleInfo.embedded);
-  const chapterInfo = analyzeChapters(mediaInfoTracks, ffProbeChapters, context.file, context);
+  const chapterInfo = analyzeChapters(mediaInfoTracks, ffProbeChapters, context.file);
   const mediaInfo = analyzeMediaInfo(fileInfo.nameNoExtension, mediaInfoTracks);
   const metadataInfo = analyzeMetadata(streams, context.file?.ffProbeData?.format?.tags || {});
   const summary = createAnalysisSummary(fileInfo, streamInfo, chapterInfo, metadataInfo, subtitleInfo.external);
@@ -39,7 +39,7 @@ function analyzeFile(context) {
     media: mediaInfo,
     streams: streamInfo,
     summary,
-    chapters: chapterInfo.chapters,
+    chapters: chapterInfo,
     externalSubtitles: subtitleInfo.external,
     metadata: metadataInfo,
     originalLanguage: null,

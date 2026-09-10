@@ -79,24 +79,31 @@ function createChapterMetadataFile(context, chapterPlan) {
   }
 
   const durationSeconds = Math.floor(Number(chapterPlan.durationSeconds || 0));
-  const generatedCount = Math.floor(Number(chapterPlan.generatedCount || 0));
-  const intervalSeconds = Math.floor(Number(chapterPlan.intervalSeconds || 300));
+  const markers = Array.isArray(chapterPlan.markers)
+    ? chapterPlan.markers
+      .map(Number)
+      .filter((marker) => Number.isFinite(marker) && marker >= 0 && marker < durationSeconds)
+    : [];
 
-  if (durationSeconds <= 1 || generatedCount <= 0) {
+  if (durationSeconds <= 0 || markers.length === 0) {
     return {
-      error: 'Generated chapter marker file requires a positive duration and chapter count.',
+      error: 'Generated chapter marker file requires a positive duration and planned chapter markers.',
     };
   }
-
-  fs.mkdirSync(cacheDir, { recursive: true });
 
   const fileIdentity = context.file?._id || context.file?.file || context.file?.meta?.SourceFile || 'media_optimizer_file';
   const fileHash = crypto.createHash('md5').update(String(fileIdentity)).digest('hex');
   const chapterPath = path.join(cacheDir, `${fileHash}.ffmetadata`);
-  const markers = buildChapterMarkers(durationSeconds, generatedCount, intervalSeconds);
   const metadata = renderChapterMetadata(markers, durationSeconds);
 
-  fs.writeFileSync(chapterPath, metadata);
+  try {
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(chapterPath, metadata);
+  } catch (error) {
+    return {
+      error: `Generated chapter marker file could not be written: ${error.message}`,
+    };
+  }
 
   return {
     path: chapterPath,
@@ -128,31 +135,6 @@ function resolveChapterMetadataDirectory(context) {
 
 function isTdarrWorkDirectory(directoryPath) {
   return /(?:^|[\\/])tdarr-workDir/i.test(String(directoryPath || ''));
-}
-
-function buildChapterMarkers(durationSeconds, generatedCount, intervalSeconds) {
-  const markers = [];
-  const intervalMarkerCount = Math.ceil(durationSeconds / intervalSeconds) + 1;
-
-  if (generatedCount >= intervalMarkerCount) {
-    for (let second = 0; second < durationSeconds; second += intervalSeconds) {
-      markers.push(second);
-    }
-  } else if (generatedCount === 1) {
-    markers.push(0);
-  } else {
-    for (let index = 0; index < generatedCount - 1; index += 1) {
-      markers.push(Math.floor(((durationSeconds - 1) * index) / (generatedCount - 1)));
-    }
-  }
-
-  const finalMarker = Math.max(0, durationSeconds - 1);
-
-  if (markers[markers.length - 1] !== finalMarker) {
-    markers.push(finalMarker);
-  }
-
-  return markers.slice(0, generatedCount);
 }
 
 function renderChapterMetadata(markers, durationSeconds) {

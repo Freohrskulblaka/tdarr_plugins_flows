@@ -13,6 +13,16 @@ function analyzeFileInfo(file, settings) {
   const container = file?.container || '';
   const targetContainer = settings.output.container;
   const fileExtension = file?.meta?.FileTypeExtension || container;
+  const durationSeconds = [
+    file?.mediaInfo?.format?.duration,
+    file?.mediaInfo?.format?.Duration,
+    file?.meta?.Duration,
+    file?.duration,
+  ]
+    .map(Number)
+    .find((duration) => Number.isFinite(duration) && duration > 0) || 0;
+  const isTdarrCacheOutput = [file?._id, file?.file]
+    .some((value) => String(value || '').includes('TdarrCacheFile'));
 
   const fileInfo = {
     id: file?._id || '',
@@ -23,6 +33,8 @@ function analyzeFileInfo(file, settings) {
     extension: fileExtension ? `.${fileExtension}` : '',
     type: file?.meta?.FileType || '',
     targetContainer,
+    durationSeconds,
+    isTdarrCacheOutput,
     needsRemux: Boolean(container && container !== targetContainer),
     useGenpts: hasInvalidStreamDuration(file?.ffProbeData?.streams || []),
   };
