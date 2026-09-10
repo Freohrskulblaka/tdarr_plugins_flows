@@ -18,7 +18,7 @@ const { analyzeVideoStreams } = require('../domains/video/analyze');
 const { analyzeAudioStreams } = require('../domains/audio/analyze');
 const { analyzeChapters } = require('../domains/chapters/analyze');
 const { analyzeFileInfo } = require('../domains/file/analyze');
-const { analyzeMediaInfo } = require('../domains/media_info/analyze');
+const { analyzeMediaIdentity } = require('../domains/media/analyze');
 const { analyzeMetadata } = require('../domains/metadata/analyze');
 const { analyzeSubtitles } = require('../domains/subtitles/analyze');
 
@@ -26,17 +26,17 @@ function analyzeFile(context) {
   const streams = context.file?.ffProbeData?.streams || [];
   const mediaInfoTracks = context.file?.mediaInfo?.track || [];
   const ffProbeChapters = context.file?.ffProbeData?.chapters || [];
-  const fileInfo = analyzeFileInfo(context.file, context.settings);
+  const fileInfo = analyzeFileInfo(context.file);
   const subtitleInfo = analyzeSubtitles(streams, mediaInfoTracks, fileInfo);
   const streamInfo = analyzeStreams(streams, mediaInfoTracks, context.file, subtitleInfo.embedded);
   const chapterInfo = analyzeChapters(mediaInfoTracks, ffProbeChapters, context.file);
-  const mediaInfo = analyzeMediaInfo(fileInfo.nameNoExtension, mediaInfoTracks);
+  const mediaIdentity = analyzeMediaIdentity(fileInfo.nameNoExtension);
   const metadataInfo = analyzeMetadata(streams, context.file?.ffProbeData?.format?.tags || {});
   const summary = createAnalysisSummary(fileInfo, streamInfo, chapterInfo, metadataInfo, subtitleInfo.external);
 
   const analysis = {
     file: fileInfo,
-    media: mediaInfo,
+    media: mediaIdentity,
     streams: streamInfo,
     summary,
     chapters: chapterInfo,
@@ -69,8 +69,7 @@ function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, metadataInfo, 
   const summary = {
     isVideoFile: fileInfo.medium === 'video',
     isNotVideoFile: fileInfo.medium !== 'video',
-    needsRemux: fileInfo.needsRemux,
-    useGenpts: fileInfo.useGenpts,
+    hasInvalidStreamDurations: fileInfo.hasInvalidStreamDurations,
     hasVideo: streamInfo.video.hasStreams,
     hasAudio: streamInfo.audio.hasStreams,
     hasSubtitles: streamInfo.subtitle.hasStreams,

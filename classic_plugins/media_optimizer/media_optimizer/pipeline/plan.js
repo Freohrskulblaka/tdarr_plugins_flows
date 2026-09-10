@@ -94,25 +94,31 @@ function validateRequiredStreams(context) {
 
 function planContainer(context) {
   const reasons = [];
-  const shouldRemux = context.analysis.file.needsRemux;
+  const sourceContainer = context.analysis.file.container;
+  const targetContainer = String(context.settings.output.container || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\./, '');
+  const shouldRemux = Boolean(sourceContainer && targetContainer && sourceContainer !== targetContainer);
   const isCacheOutput = context.analysis.file.isTdarrCacheOutput;
-  const useGenpts = Boolean(context.analysis.file.useGenpts && shouldRemux && !isCacheOutput);
+  const hasInvalidStreamDurations = context.analysis.file.hasInvalidStreamDurations;
+  const useGenpts = Boolean(hasInvalidStreamDurations && shouldRemux && !isCacheOutput);
 
   if (shouldRemux) {
-    reasons.push(`Container ${context.analysis.file.container} does not match target ${context.settings.output.container}.`);
+    reasons.push(`Container ${sourceContainer} does not match target ${targetContainer}.`);
   }
 
   if (useGenpts) {
     reasons.push('One or more streams have missing or unavailable duration; genpts may be required.');
-  } else if (context.analysis.file.useGenpts && isCacheOutput) {
+  } else if (hasInvalidStreamDurations && isCacheOutput) {
     reasons.push('Genpts-only remux is skipped on Tdarr cache outputs to avoid cyclic cleanup passes.');
-  } else if (context.analysis.file.useGenpts && !shouldRemux) {
+  } else if (hasInvalidStreamDurations && !shouldRemux) {
     reasons.push('Genpts-only remux is skipped because the container already matches the target.');
   }
 
   const containerPlan = {
-    sourceContainer: context.analysis.file.container,
-    targetContainer: context.settings.output.container,
+    sourceContainer,
+    targetContainer,
     shouldRemux,
     useGenpts,
     shouldProcess: shouldRemux || useGenpts,
