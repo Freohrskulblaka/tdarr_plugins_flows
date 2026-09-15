@@ -87,7 +87,7 @@ const LANGUAGE_ALIASES = Object.fromEntries([
   return [canonical, ...aliases].map((alias) => [alias, canonical]);
 }));
 
-function detectLanguageVariant(language, languageCodes, titleValues) {
+function detectLanguageVariant(language, languageCodes = [], titleValues = []) {
   const normalizedLanguage = normalizeLanguageForVariant(language);
   const variantRules = LANGUAGE_VARIANT_RULES[normalizedLanguage] || [];
 
@@ -95,21 +95,19 @@ function detectLanguageVariant(language, languageCodes, titleValues) {
     return '';
   }
 
-  const normalizedLanguageCodes = languageCodes.map(normalizeVariantText);
-  const normalizedTitle = normalizeVariantText(titleValues.join(' '));
-  const codeMatch = variantRules.find((rule) => {
-    return rule.codes.some((code) => normalizedLanguageCodes.includes(code));
+  const normalizedSourceText = normalizeVariantText([...languageCodes, ...titleValues].join(' '))
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  const paddedSourceText = ` ${normalizedSourceText} `;
+  const matchingRule = variantRules.find((rule) => {
+    return rule.codes.some((code) => {
+      const codeWords = code.replace(/[^a-z0-9]+/g, ' ');
+      return paddedSourceText.includes(` ${codeWords} `);
+    })
+      || rule.patterns.some((pattern) => pattern.test(normalizedSourceText));
   });
 
-  if (codeMatch) {
-    return codeMatch.variant;
-  }
-
-  const titleMatch = variantRules.find((rule) => {
-    return rule.patterns.some((pattern) => pattern.test(normalizedTitle));
-  });
-
-  return titleMatch?.variant || '';
+  return matchingRule?.variant || '';
 }
 
 function createLanguageLabel(language, languageVariant) {

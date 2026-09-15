@@ -6,7 +6,7 @@
  * Changelog: ../../docs/media_optimizer_changelog.md
  */
 
-const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-runtime-2026-09-15-39';
+const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-utils-2026-09-15-40';
 const { loadInputs, prepareConfig, createContext } = require('./media_optimizer/runtime/config');
 const { createResponse } = require('./media_optimizer/runtime/response');
 const { runInPlaceActions } = require('./media_optimizer/pipeline/actions');

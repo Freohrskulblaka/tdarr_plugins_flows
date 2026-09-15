@@ -6,6 +6,14 @@ History of `../classic_plugins/media_optimizer/tdarr_plugin_media_optimizer.js` 
 
 ## 2026-09-15 - Freohrskulblaka
 
+### Consolidated shared utility behavior
+
+External subtitle filename languages now use the shared language normalizer instead of a separate four-language map. Language variant detection now recognizes underscore-separated codes and regional labels supplied through either language metadata or titles.
+
+Simplified shared collection and FFmpeg argument helpers, preserved numeric and boolean quoted values, and folded the one-use output-index lookup into metadata command rendering.
+
+Runtime marker: `media-optimizer-utils-2026-09-15-40`.
+
 ### Hardened and simplified runtime configuration
 
 Runtime input parsing now canonicalizes recognized choices, booleans, and language aliases before planning. Malformed booleans, lookup modes, log levels, language tokens, and profile names produce controlled configuration errors, with invalid dry-run values failing closed to dry-run mode instead of enabling processing.

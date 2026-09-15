@@ -22,7 +22,6 @@ const { analyzeTrackIntent } = require('../../utils/track_intent');
 const PICTURE_SUBTITLE_CODECS = ['hdmv_pgs_subtitle', 'dvd_subtitle'];
 const TEXT_SUBTITLE_CODECS = ['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'mov_text'];
 const SUBTITLE_FORMAT_LABELS = {ass: 'ASS', dvd_subtitle: 'DVD', hdmv_pgs_subtitle: 'PGS', pgs: 'PGS', srt: 'SRT', ssa: 'SSA', subrip: 'SRT', 'utf-8': 'SRT', webvtt: 'WEBVTT'};
-const SUBTITLE_LANGUAGE_FILE_TOKENS = {en: 'eng', eng: 'eng', es: 'spa', spa: 'spa', fr: 'fre', fre: 'fre', fra: 'fre', pt: 'por', por: 'por'};
 const SUBTITLE_FORMAT_KEY_ALIASES = {hdmv_pgs_subtitle: 'pgs', pgs: 'pgs', srt: 'srt', subrip: 'srt'};
 const NON_LANGUAGE_SUBTITLE_TOKENS = new Set(['ass', 'dub', 'pgs', 'sdh', 'srt', 'ssa', 'sub', 'sup', 'vtt']);
 const DIALOGUE_CUE_PATTERN = /^\s*Dialogue:/gm;
@@ -132,10 +131,11 @@ function analyzeExternalSubtitleFiles(fileInfo) {
       const sourcePath = path.join(directory, fileName);
       const suffix = normalizedBaseName === mediaName ? '' : normalizedBaseName.slice(mediaName.length + 1);
       const suffixParts = suffix.split(/[^a-z0-9]+/);
-      const mappedLanguageToken = suffixParts.find((token) => SUBTITLE_LANGUAGE_FILE_TOKENS[token]);
-      const genericLanguageToken = suffixParts.find((token) => /^[a-z]{3}$/.test(token) && !NON_LANGUAGE_SUBTITLE_TOKENS.has(token));
-      const language = normalizeLanguageForVariant(SUBTITLE_LANGUAGE_FILE_TOKENS[mappedLanguageToken] || genericLanguageToken || 'und');
-      const languageVariant = detectLanguageVariant(language, [language], [baseName]);
+      const languageToken = suffixParts.find((token) => {
+        return !NON_LANGUAGE_SUBTITLE_TOKENS.has(token) && normalizeLanguageForVariant(token) !== 'und';
+      });
+      const language = normalizeLanguageForVariant(languageToken || 'und');
+      const languageVariant = detectLanguageVariant(language, [languageToken], [baseName]);
       const streamSize = fs.statSync(sourcePath).size;
       let cueCount = null;
 

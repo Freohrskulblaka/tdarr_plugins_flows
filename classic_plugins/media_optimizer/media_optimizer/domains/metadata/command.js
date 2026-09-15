@@ -7,7 +7,7 @@
  * - 2026-08-04 - Freohrskulblaka: Strip global metadata without removing generated chapter titles.
  */
 
-const { findOutputIndex, quoteArg } = require('../../utils/command_args');
+const { quoteArg } = require('../../utils/command_args');
 
 function addMetadataArgs(args, plan, warnings, unsupportedSteps) {
   const metadataPlan = plan.metadata || {};
@@ -22,7 +22,9 @@ function addMetadataArgs(args, plan, warnings, unsupportedSteps) {
 
   (metadataPlan.videoTitleTracks || []).forEach((track) => {
     if (track.action === 'removeTitle') {
-      const outputVideoIndex = findOutputIndex(plan.video?.tracks, track.sourceIndex);
+      const outputVideoIndex = (plan.video?.tracks || []).find((candidate) => {
+        return candidate.action !== 'remove' && candidate.sourceIndex === track.sourceIndex;
+      })?.outputIndex ?? null;
 
       if (outputVideoIndex !== null) {
         args.push(`-metadata:s:v:${outputVideoIndex}`, quoteArg('title='));

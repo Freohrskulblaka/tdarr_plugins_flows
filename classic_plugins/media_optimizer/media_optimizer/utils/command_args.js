@@ -8,9 +8,7 @@
  */
 
 function addStreamMetadata(args, streamType, outputIndex, values) {
-  Object.keys(values).forEach((key) => {
-    const value = values[key];
-
+  Object.entries(values).forEach(([key, value]) => {
     if (value === undefined || value === null || String(value).trim() === '') {
       return;
     }
@@ -20,11 +18,8 @@ function addStreamMetadata(args, streamType, outputIndex, values) {
 }
 
 function addDisposition(args, streamType, outputIndex, dispositions) {
-  const dispositionValue = Object.keys(dispositions)
-    .map((key) => {
-      const value = dispositions[key];
-      return `${value ? '+' : '-'}${key}`;
-    })
+  const dispositionValue = Object.entries(dispositions)
+    .map(([key, value]) => `${value ? '+' : '-'}${key}`)
     .join('');
 
   if (dispositionValue) {
@@ -32,15 +27,8 @@ function addDisposition(args, streamType, outputIndex, dispositions) {
   }
 }
 
-function findOutputIndex(tracks, sourceIndex) {
-  const outputTracks = (tracks || []).filter((track) => track.action !== 'remove');
-  const track = outputTracks.find((candidate) => candidate.sourceIndex === sourceIndex);
-
-  return track ? track.outputIndex : null;
-}
-
 function quoteArg(value) {
-  const text = String(value || '');
+  const text = String(value ?? '');
   const escaped = text.replace(/"/g, '\\"');
 
   return `"${escaped}"`;
@@ -49,6 +37,5 @@ function quoteArg(value) {
 module.exports = {
   addDisposition,
   addStreamMetadata,
-  findOutputIndex,
   quoteArg,
 };

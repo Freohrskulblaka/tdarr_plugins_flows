@@ -8,10 +8,7 @@
  */
 
 function getUniqueValues(items, getValue) {
-  const values = items.map(getValue);
-  const uniqueValues = [...new Set(values)];
-
-  return uniqueValues;
+  return [...new Set(items.map(getValue))];
 }
 
 module.exports = {
