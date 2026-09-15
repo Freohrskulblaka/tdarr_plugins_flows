@@ -6,6 +6,12 @@ History of `../classic_plugins/media_optimizer/tdarr_plugin_media_optimizer.js` 
 
 ## 2026-09-15 - Freohrskulblaka
 
+### Simplified and hardened Arr original-language lookup
+
+Removed retired global-variable, library-variable, and Flow-shaped lookup paths so the integration follows the Arr connection profile exposed by the classic plugin. Lookup requests now preserve reverse-proxy URL base paths, send API keys through the `X-Api-Key` header, and time out safely instead of leaving a worker waiting indefinitely.
+
+Original-language fallback now consumes normalized audio analysis rather than raw lowercase tags. Shared language normalization covers the current Sonarr/Radarr language set and keeps unsupported response values from replacing a valid local fallback. Radarr title searches also require an unambiguous title/year match when multiple candidates are returned.
+
 ### Added fail-safe dynamic HDR preservation
 
 Added explicit HDR handling profiles, richer HDR10, HLG, HDR10+, and Dolby Vision analysis, and a fail-safe video planning rule. Media Optimizer can transcode static HDR10 and HLG with source color signaling, but copies HDR10+ and Dolby Vision video so it never silently drops dynamic metadata.

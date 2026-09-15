@@ -7,66 +7,71 @@
 
 function parseArrConnectionProfile(value) {
   const allowedRootKeys = ['sonarr', 'radarr'];
-  const allowedConnectionKeys = ['host', 'url', 'apiKey', 'api_key', 'key'];
-  const emptyConnection = () => ({ host: '', apiKey: '', isConfigured: false });
-  const normalizeConnection = (entry) => {
-    const connection = {host: '', apiKey: '', isConfigured: false};
-
-    if (!entry || typeof entry !== 'object') {
-      connection.isConfigured = false;
-    } else {
-      connection.host = String(entry.host || entry.url || '').trim();
-      connection.apiKey = String(entry.apiKey || entry.api_key || entry.key || '').trim();
-      connection.isConfigured = Boolean(connection.host && connection.apiKey);
-    }
-
-    return connection;
-  };
+  const allowedConnectionKeys = ['host', 'apiKey'];
 
   const rawValue = String(value || '').trim();
   const connectionProfile = {
     isInvalid: false,
     validationError: '',
-    sonarr: emptyConnection(),
-    radarr: emptyConnection(),
+    sonarr: {host: '', apiKey: ''},
+    radarr: {host: '', apiKey: ''},
   };
-  let parsedProfile = {};
 
   if (!rawValue) {
     return connectionProfile;
   }
 
+  let parsedProfile;
+
   try {
-    const parsedValue = JSON.parse(rawValue);
-    parsedProfile = parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue) ? parsedValue : {};
+    parsedProfile = JSON.parse(rawValue);
   } catch (error) {
     connectionProfile.isInvalid = true;
     connectionProfile.validationError = `Invalid arrConnectionProfile JSON: ${error.message}`;
     return connectionProfile;
   }
 
-  const unknownRootKeys = Object.keys(parsedProfile).filter((key) => !allowedRootKeys.includes(key));
-  const unknownConnectionKeys = allowedRootKeys.flatMap((appName) => {
-    const entry = parsedProfile[appName];
-
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-      return [];
-    }
-
-    return Object.keys(entry)
-      .filter((key) => !allowedConnectionKeys.includes(key))
-      .map((key) => `${appName}.${key}`);
-  });
-  const unknownKeys = [...unknownRootKeys, ...unknownConnectionKeys];
-
-  if (unknownKeys.length > 0) {
+  if (!parsedProfile || typeof parsedProfile !== 'object' || Array.isArray(parsedProfile)) {
     connectionProfile.isInvalid = true;
-    connectionProfile.validationError = `Invalid arrConnectionProfile keys: ${unknownKeys.join(', ')}. Allowed root keys: ${allowedRootKeys.join(', ')}. Allowed connection keys: ${allowedConnectionKeys.join(', ')}.`;
+    connectionProfile.validationError = 'Invalid arrConnectionProfile: expected a JSON object.';
     return connectionProfile;
   }
 
-  connectionProfile.sonarr = normalizeConnection(parsedProfile.sonarr);
-  connectionProfile.radarr = normalizeConnection(parsedProfile.radarr);
+  const errors = Object.keys(parsedProfile)
+    .filter((key) => !allowedRootKeys.includes(key))
+    .map((key) => `unknown root key ${key}`);
+
+  allowedRootKeys.forEach((appName) => {
+    const entry = parsedProfile[appName];
+
+    if (entry === undefined || entry === null) {
+      return;
+    }
+
+    if (typeof entry !== 'object' || Array.isArray(entry)) {
+      errors.push(`${appName} must be an object`);
+      return;
+    }
+
+    errors.push(...Object.keys(entry)
+      .filter((key) => !allowedConnectionKeys.includes(key))
+      .map((key) => `unknown key ${appName}.${key}`));
+
+    const host = String(entry.host || '').trim();
+    const apiKey = String(entry.apiKey || '').trim();
+
+    if (Boolean(host) !== Boolean(apiKey)) {
+      errors.push(`${appName} requires both host and apiKey`);
+      return;
+    }
+
+    connectionProfile[appName] = {host, apiKey};
+  });
+
+  if (errors.length > 0) {
+    connectionProfile.isInvalid = true;
+    connectionProfile.validationError = `Invalid arrConnectionProfile: ${errors.join('; ')}. Expected keys: sonarr.host, sonarr.apiKey, radarr.host, radarr.apiKey.`;
+  }
 
   return connectionProfile;
 }

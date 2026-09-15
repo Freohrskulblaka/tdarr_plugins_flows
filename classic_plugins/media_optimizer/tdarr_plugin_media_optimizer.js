@@ -256,7 +256,8 @@ function details() {
         tooltip: `
           Optional JSON object for Sonarr/Radarr original-language lookup.\\n
           Include only the services you use.\\n
-          Hosts can include or omit http://.\\n
+          Hosts can include or omit http:// and may include a reverse-proxy URL base path.\\n
+          API keys are sent through the X-Api-Key request header instead of the request URL.\\n
           Do not deploy local .env harness files; this input is the Tdarr-side connection profile.\\n
           The expected keys are sonarr.host, sonarr.apiKey, radarr.host, and radarr.apiKey.\\n
           Example with both services:\\n

@@ -27,6 +27,66 @@ const LANGUAGE_VARIANT_RULES = {
   ],
 };
 
+const LANGUAGE_ALIASES = Object.fromEntries([
+  ['eng', 'en', 'english'],
+  ['fre', 'fr', 'fra', 'french'],
+  ['spa', 'es', 'spanish', 'spanish (latino)'],
+  ['ger', 'de', 'deu', 'german'],
+  ['ita', 'it', 'italian'],
+  ['dan', 'da', 'danish'],
+  ['dut', 'nl', 'nld', 'dutch', 'flemish'],
+  ['jpn', 'ja', 'japanese'],
+  ['ice', 'is', 'isl', 'icelandic'],
+  ['chi', 'zh', 'zho', 'chinese'],
+  ['rus', 'ru', 'russian'],
+  ['pol', 'pl', 'polish'],
+  ['vie', 'vi', 'vietnamese'],
+  ['swe', 'sv', 'swedish'],
+  ['nor', 'no', 'norwegian'],
+  ['nob', 'nb', 'norwegian bokmal'],
+  ['fin', 'fi', 'finnish'],
+  ['tur', 'tr', 'turkish'],
+  ['por', 'pt', 'portuguese', 'portuguese (brazil)'],
+  ['gre', 'el', 'ell', 'greek'],
+  ['kor', 'ko', 'korean'],
+  ['hun', 'hu', 'hungarian'],
+  ['heb', 'he', 'hebrew'],
+  ['lit', 'lt', 'lithuanian'],
+  ['cze', 'cs', 'ces', 'czech'],
+  ['hin', 'hi', 'hindi'],
+  ['rum', 'ro', 'ron', 'romanian'],
+  ['tha', 'th', 'thai'],
+  ['bul', 'bg', 'bulgarian'],
+  ['ara', 'ar', 'arabic'],
+  ['ukr', 'uk', 'ukrainian'],
+  ['per', 'fa', 'fas', 'persian'],
+  ['ben', 'bn', 'bengali'],
+  ['slo', 'sk', 'slk', 'slovak'],
+  ['lav', 'lv', 'latvian'],
+  ['cat', 'ca', 'catalan'],
+  ['hrv', 'hr', 'croatian'],
+  ['srp', 'sr', 'serbian'],
+  ['bos', 'bs', 'bosnian'],
+  ['est', 'et', 'estonian'],
+  ['tam', 'ta', 'tamil'],
+  ['ind', 'id', 'indonesian'],
+  ['tel', 'te', 'telugu'],
+  ['mac', 'mk', 'mkd', 'macedonian'],
+  ['slv', 'sl', 'slovenian'],
+  ['mal', 'ml', 'malayalam'],
+  ['kan', 'kn', 'kannada'],
+  ['alb', 'sq', 'sqi', 'albanian'],
+  ['afr', 'af', 'afrikaans'],
+  ['mar', 'mr', 'marathi'],
+  ['tgl', 'tl', 'tagalog'],
+  ['urd', 'ur', 'urdu'],
+  ['roh', 'rm', 'romansh'],
+  ['mon', 'mn', 'mongolian'],
+  ['geo', 'ka', 'kat', 'georgian'],
+].flatMap(([canonical, ...aliases]) => {
+  return [canonical, ...aliases].map((alias) => [alias, canonical]);
+}));
+
 function detectLanguageVariant(language, languageCodes, titleValues) {
   const normalizedLanguage = normalizeLanguageForVariant(language);
   const variantRules = LANGUAGE_VARIANT_RULES[normalizedLanguage] || [];
@@ -63,15 +123,11 @@ function createLanguageLabel(language, languageVariant) {
 }
 
 function normalizeLanguageForVariant(language) {
-  const normalizedLanguage = String(language || 'und').trim().toLowerCase();
-  const languageAliases = {
-    en: 'eng',
-    es: 'spa',
-    fr: 'fre',
-    fra: 'fre',
-    pt: 'por',
-  };
-  const canonicalLanguage = languageAliases[normalizedLanguage] || normalizedLanguage || 'und';
+  const normalizedLanguage = normalizeVariantText(language).trim().replace(/_/g, '-');
+  const baseLanguage = normalizedLanguage.split('-')[0];
+  const canonicalLanguage = LANGUAGE_ALIASES[normalizedLanguage]
+    || LANGUAGE_ALIASES[baseLanguage]
+    || (/^[a-z]{3}$/.test(baseLanguage) ? baseLanguage : 'und');
 
   return canonicalLanguage;
 }

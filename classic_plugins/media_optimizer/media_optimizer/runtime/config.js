@@ -32,7 +32,7 @@ function prepareConfig(inputs) {
   const subtitleLanguageOrder = parseList(inputs.subtitleLanguages);
   const arrConnectionProfile = parseArrConnectionProfile(inputs.arrConnectionProfile);
 
-  if (arrConnectionProfile.isInvalid) {
+  if (inputs.originalLanguageLookup === 'Sonarr/Radarr Arr Profile' && arrConnectionProfile.isInvalid) {
     validationErrors.push(arrConnectionProfile.validationError);
   }
 
