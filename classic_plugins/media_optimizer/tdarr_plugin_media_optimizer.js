@@ -11,10 +11,15 @@ const { loadInputs, prepareConfig, createContext } = require('./media_optimizer/
 const { createResponse } = require('./media_optimizer/runtime/response');
 const { runInPlaceActions } = require('./media_optimizer/pipeline/actions');
 const { resolveOriginalLanguage } = require('./media_optimizer/integrations/arr_original_language');
-const { analyzeFile, summarizeAnalysis } = require('./media_optimizer/pipeline/analyze');
+const { analyzeFile } = require('./media_optimizer/pipeline/analyze');
 const { buildProcessingPlan } = require('./media_optimizer/pipeline/plan');
-const { buildFfmpegCommand, renderFfmpegCommandPreview } = require('./media_optimizer/pipeline/command');
-const { renderFinalTrackTable, renderPlanSummary } = require('./media_optimizer/pipeline/format');
+const { buildFfmpegCommand } = require('./media_optimizer/pipeline/command');
+const {
+  renderFfmpegCommandPreview,
+  renderFinalTrackTable,
+  renderPlanSummary,
+  summarizeAnalysis,
+} = require('./media_optimizer/pipeline/format');
 
 // #region Plugin Metadata
 function details() {
@@ -331,20 +336,24 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
   context.plan = buildProcessingPlan(context);
 
   if (!context.plan.isValid) {
-    context.log.info('Analysis summary', summarizeAnalysis(context.analysis));
+    context.log.info('Analysis summary', summarizeAnalysis(context.analysis, context.settings));
     context.log.error('Processing plan is invalid', context.plan.validation.reasons);
     return createResponse(context);
   }
 
   context.plan.command = buildFfmpegCommand(context);
-  context.plan.ffmpegArgs = context.plan.command.args;
+
+  if (context.plan.shouldProcess && !context.plan.command.isExecutable) {
+    context.log.error('Processing is required but the FFmpeg command cannot be executed', context.plan.command.unsupportedSteps);
+  }
+
   runInPlaceActions(context);
 
   if (context.settings.logLevel === 'summary') {
     context.log.section('Compliance summary');
     context.log.summary(renderPlanSummary(context.plan, context.analysis));
   } else if (context.plan.shouldProcess || context.settings.dryRun) {
-    context.log.info('Analysis summary', summarizeAnalysis(context.analysis));
+    context.log.info('Analysis summary', summarizeAnalysis(context.analysis, context.settings));
     context.log.section('Planned final track table');
     context.log.info(renderFinalTrackTable(context.plan));
     context.log.section('Planned FFmpeg command');
@@ -353,7 +362,7 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
     const isDebugNoOp = context.settings.logLevel === 'debug';
 
     if (isDebugNoOp) {
-      context.log.info('Analysis summary', summarizeAnalysis(context.analysis));
+      context.log.info('Analysis summary', summarizeAnalysis(context.analysis, context.settings));
     }
     context.log.section('Compliance summary');
     context.log.info(renderPlanSummary(context.plan, context.analysis, { includeReasons: isDebugNoOp }));

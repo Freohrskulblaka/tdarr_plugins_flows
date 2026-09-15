@@ -15,7 +15,7 @@ const path = require('path');
 
 const { quoteArg } = require('../../utils/command_args');
 
-function addGeneratedChapterInput(context, chapterPlan, inputArgs, inputIndex) {
+function addGeneratedChapterInput(context, chapterPlan, inputArgs, inputIndex, materialize) {
   if (chapterPlan?.action !== 'add') {
     return {
       chapterInput: null,
@@ -23,7 +23,7 @@ function addGeneratedChapterInput(context, chapterPlan, inputArgs, inputIndex) {
     };
   }
 
-  const chapterFile = createChapterMetadataFile(context, chapterPlan);
+  const chapterFile = prepareChapterMetadataFile(context, chapterPlan, materialize);
 
   if (!chapterFile.path) {
     return {
@@ -69,7 +69,7 @@ function addChapterArgs(args, chapterPlan, chapterInput, unsupportedSteps) {
   args.push('-map_chapters', '-1');
 }
 
-function createChapterMetadataFile(context, chapterPlan) {
+function prepareChapterMetadataFile(context, chapterPlan, materialize) {
   const cacheDir = resolveChapterMetadataDirectory(context);
 
   if (!cacheDir) {
@@ -94,15 +94,16 @@ function createChapterMetadataFile(context, chapterPlan) {
   const fileIdentity = context.file?._id || context.file?.file || context.file?.meta?.SourceFile || 'media_optimizer_file';
   const fileHash = crypto.createHash('md5').update(String(fileIdentity)).digest('hex');
   const chapterPath = path.join(cacheDir, `${fileHash}.ffmetadata`);
-  const metadata = renderChapterMetadata(markers, durationSeconds);
 
-  try {
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(chapterPath, metadata);
-  } catch (error) {
-    return {
-      error: `Generated chapter marker file could not be written: ${error.message}`,
-    };
+  if (materialize) {
+    try {
+      fs.mkdirSync(cacheDir, { recursive: true });
+      fs.writeFileSync(chapterPath, renderChapterMetadata(markers, durationSeconds));
+    } catch (error) {
+      return {
+        error: `Generated chapter marker file could not be written: ${error.message}`,
+      };
+    }
   }
 
   return {

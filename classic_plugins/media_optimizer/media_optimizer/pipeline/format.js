@@ -2,7 +2,7 @@
  * Media Optimizer Formatting Library
  * Created by: Freohrskulblaka
  * Created on: 2026-06-29
- * Description: Formats media optimizer plan details into readable Tdarr log output.
+ * Description: Formats media optimizer analysis, plan, and FFmpeg command details into readable Tdarr log output.
  * Updates:
  * - 2026-06-29 - Freohrskulblaka: Created final track table formatting helper.
  * - 2026-06-30 - Freohrskulblaka: Updated formatting for sectioned processing plans.
@@ -35,6 +35,49 @@ function renderFinalTrackTable(plan) {
     plan.reasons.forEach((reason) => {
       lines.push(`  - ${reason}`);
     });
+  }
+
+  return lines.join('\n');
+}
+
+function summarizeAnalysis(analysis, settings = {}) {
+  return {
+    file: analysis.file,
+    media: {
+      type: analysis.media.type,
+      name: analysis.media.name,
+      year: analysis.media.year,
+      season: analysis.media.season,
+      episode: analysis.media.episode,
+      absoluteEpisode: analysis.media.absoluteEpisode,
+      resolution: analysis.media.resolution,
+      imdbId: analysis.media.imdbId,
+      tvdbId: analysis.media.tvdbId,
+    },
+    container: analysis.file.container,
+    fileMedium: analysis.file.medium,
+    videoCodec: analysis.streams.video.codecs[0] || '',
+    videoResolution: analysis.media.resolution,
+    videoSettings: settings.video,
+    streamSummary: analysis.summary,
+    originalLanguage: analysis.originalLanguage,
+  };
+}
+
+function renderFfmpegCommandPreview(command) {
+  const lines = [
+    `Executable in current slice: ${command.isExecutable ? 'yes' : 'no'}`,
+    `Preset: ${command.preset || '(empty)'}`,
+  ];
+
+  if (command.warnings.length > 0) {
+    lines.push('', 'Warnings:');
+    command.warnings.forEach((warning) => lines.push(`  - ${warning}`));
+  }
+
+  if (command.unsupportedSteps.length > 0) {
+    lines.push('', 'Deferred command steps:');
+    command.unsupportedSteps.forEach((step) => lines.push(`  - ${step}`));
   }
 
   return lines.join('\n');
@@ -298,6 +341,8 @@ function getChapterDisplayCount(chapterPlan) {
 }
 
 module.exports = {
+  renderFfmpegCommandPreview,
   renderFinalTrackTable,
   renderPlanSummary,
+  summarizeAnalysis,
 };

@@ -6,6 +6,12 @@ History of `../classic_plugins/media_optimizer/tdarr_plugin_media_optimizer.js` 
 
 ## 2026-09-15 - Freohrskulblaka
 
+### Simplified pipeline orchestration and dry-run handling
+
+Consolidated plan section processing, removed the unused duplicate FFmpeg argument list, and moved analysis and command-preview formatting into the formatting pipeline. Analysis now remains limited to source facts while command construction remains limited to execution arguments.
+
+Dry-run chapter previews no longer create temporary `.ffmetadata` files. Process mode still materializes generated chapter metadata before returning an executable FFmpeg preset. Required but unsupported commands now produce an explicit error at every log level instead of silently returning no-process in summary mode.
+
 ### Simplified and hardened Arr original-language lookup
 
 Removed retired global-variable, library-variable, and Flow-shaped lookup paths so the integration follows the Arr connection profile exposed by the classic plugin. Lookup requests now preserve reverse-proxy URL base paths, send API keys through the `X-Api-Key` header, and time out safely instead of leaving a worker waiting indefinitely.

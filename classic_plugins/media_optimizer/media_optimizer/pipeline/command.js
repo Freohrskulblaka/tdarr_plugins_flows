@@ -26,7 +26,13 @@ function buildFfmpegCommand(context) {
   };
   const subtitleCommand = buildSubtitleCommandArgs(plan.subtitles, streamIndexes, 1);
   inputArgs.push(...subtitleCommand.inputArgs);
-  const chapterInputs = addGeneratedChapterInput(context, plan.chapters, inputArgs, subtitleCommand.nextInputIndex);
+  const chapterInputs = addGeneratedChapterInput(
+    context,
+    plan.chapters,
+    inputArgs,
+    subtitleCommand.nextInputIndex,
+    !context.settings.dryRun,
+  );
 
   addVideoArgs(outputArgs, plan.video, streamIndexes);
   addAudioArgs(outputArgs, plan.audio, streamIndexes);
@@ -53,32 +59,6 @@ function buildFfmpegCommand(context) {
   };
 }
 
-function renderFfmpegCommandPreview(command) {
-  const lines = [];
-
-  lines.push(`Executable in current slice: ${command.isExecutable ? 'yes' : 'no'}`);
-  lines.push(`Preset: ${command.preset || '(empty)'}`);
-
-  if (command.warnings.length > 0) {
-    lines.push('');
-    lines.push('Warnings:');
-    command.warnings.forEach((warning) => {
-      lines.push(`  - ${warning}`);
-    });
-  }
-
-  if (command.unsupportedSteps.length > 0) {
-    lines.push('');
-    lines.push('Deferred command steps:');
-    command.unsupportedSteps.forEach((step) => {
-      lines.push(`  - ${step}`);
-    });
-  }
-
-  return lines.join('\n');
-}
-
 module.exports = {
   buildFfmpegCommand,
-  renderFfmpegCommandPreview,
 };

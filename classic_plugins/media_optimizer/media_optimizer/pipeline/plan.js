@@ -9,7 +9,6 @@
  * - 2026-07-01 - Freohrskulblaka: Added required media stream safeguards for video and audio.
  * - 2026-07-13 - Freohrskulblaka: Extracted attachment and chapter planning into focused planning modules.
  * - 2026-07-15 - Freohrskulblaka: Extracted metadata planning into a focused planning module.
- * - 2026-07-15 - Freohrskulblaka: Added a command placeholder for the FFmpeg renderer output.
  * - 2026-08-04 - Freohrskulblaka: Suppressed cleanup-only cache output loops in cyclic classic stacks.
  * - 2026-08-04 - Freohrskulblaka: Suppressed genpts-only original-file remux loops.
  */
@@ -23,47 +22,28 @@ const { planSubtitles } = require('../domains/subtitles/plan');
 
 function buildProcessingPlan(context) {
   const validation = validateRequiredStreams(context);
-  const video = planVideo(context);
-  const audio = planAudio(context);
-  const subtitles = planSubtitles(context);
-  const attachments = planAttachments(context);
-  const chapters = planChapters(context);
-  const metadata = planMetadata(context);
-  const container = planContainer(context);
-  const reasons = collectPlanReasons({
-    container,
-    video,
-    audio,
-    subtitles,
-    attachments,
-    chapters,
-    metadata,
+  const sections = {
+    container: planContainer(context),
+    video: planVideo(context),
+    audio: planAudio(context),
+    subtitles: planSubtitles(context),
+    attachments: planAttachments(context),
+    chapters: planChapters(context),
+    metadata: planMetadata(context),
+  };
+  const sectionReasons = Object.entries(sections).flatMap(([sectionName, section]) => {
+    return (section.reasons || [])
+      .filter(Boolean)
+      .map((reason) => `${sectionName}: ${reason}`);
   });
-  const shouldProcess = [
-    container,
-    video,
-    audio,
-    subtitles,
-    attachments,
-    chapters,
-    metadata,
-  ].some((section) => section.shouldProcess);
 
   const plan = {
     isValid: validation.isValid,
-    shouldProcess,
+    shouldProcess: Object.values(sections).some((section) => section.shouldProcess),
     validation,
-    reasons: [...validation.reasons, ...reasons],
+    reasons: [...validation.reasons, ...sectionReasons],
     outputContainer: context.settings.output.container,
-    container,
-    video,
-    audio,
-    subtitles,
-    attachments,
-    chapters,
-    metadata,
-    command: null,
-    ffmpegArgs: [],
+    ...sections,
   };
 
   return plan;
@@ -126,22 +106,6 @@ function planContainer(context) {
   };
 
   return containerPlan;
-}
-
-function collectPlanReasons(sections) {
-  const reasons = [];
-
-  Object.keys(sections).forEach((sectionName) => {
-    const section = sections[sectionName];
-
-    (section.reasons || []).forEach((reason) => {
-      if (reason) {
-        reasons.push(`${sectionName}: ${reason}`);
-      }
-    });
-  });
-
-  return reasons;
 }
 
 module.exports = {

@@ -28,7 +28,23 @@ function analyzeFile(context) {
   const ffProbeChapters = context.file?.ffProbeData?.chapters || [];
   const fileInfo = analyzeFileInfo(context.file);
   const subtitleInfo = analyzeSubtitles(streams, mediaInfoTracks, fileInfo);
-  const streamInfo = analyzeStreams(streams, mediaInfoTracks, context.file, fileInfo.durationSeconds, subtitleInfo.embedded);
+  const streamInfo = {
+    all: streams,
+    video: analyzeVideoStreams(
+      streams.filter((stream) => stream.codec_type === 'video'),
+      mediaInfoTracks,
+      context.file,
+      fileInfo.durationSeconds,
+    ),
+    audio: analyzeAudioStreams(
+      streams.filter((stream) => stream.codec_type === 'audio'),
+      mediaInfoTracks,
+    ),
+    subtitle: subtitleInfo.embedded,
+    attachment: analyzeAttachmentStreams(
+      streams.filter((stream) => stream.codec_type === 'attachment'),
+    ),
+  };
   const chapterInfo = analyzeChapters(mediaInfoTracks, ffProbeChapters, context.file);
   const mediaIdentity = analyzeMediaIdentity(fileInfo.nameNoExtension);
   const metadataInfo = analyzeMetadata(streams, context.file?.ffProbeData?.format?.tags || {});
@@ -43,26 +59,9 @@ function analyzeFile(context) {
     externalSubtitles: subtitleInfo.external,
     metadata: metadataInfo,
     originalLanguage: null,
-    videoSettings: context.settings.video,
   };
 
   return analysis;
-}
-
-function analyzeStreams(streams, mediaInfoTracks, file, durationSeconds, subtitleInfo) {
-  const videoStreams = streams.filter((stream) => stream.codec_type === 'video');
-  const audioStreams = streams.filter((stream) => stream.codec_type === 'audio');
-  const attachmentStreams = streams.filter((stream) => stream.codec_type === 'attachment');
-
-  const streamInfo = {
-    all: streams,
-    video: analyzeVideoStreams(videoStreams, mediaInfoTracks, file, durationSeconds),
-    audio: analyzeAudioStreams(audioStreams, mediaInfoTracks),
-    subtitle: subtitleInfo,
-    attachment: analyzeAttachmentStreams(attachmentStreams),
-  };
-
-  return streamInfo;
 }
 
 function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, metadataInfo, externalSubtitles) {
@@ -103,33 +102,6 @@ function createAnalysisSummary(fileInfo, streamInfo, chapterInfo, metadataInfo, 
   return summary;
 }
 
-function summarizeAnalysis(analysis) {
-  const summary = {
-    file: analysis.file,
-    media: {
-      type: analysis.media.type,
-      name: analysis.media.name,
-      year: analysis.media.year,
-      season: analysis.media.season,
-      episode: analysis.media.episode,
-      absoluteEpisode: analysis.media.absoluteEpisode,
-      resolution: analysis.media.resolution,
-      imdbId: analysis.media.imdbId,
-      tvdbId: analysis.media.tvdbId,
-    },
-    container: analysis.file.container,
-    fileMedium: analysis.file.medium,
-    videoCodec: analysis.streams.video.codecs[0] || '',
-    videoResolution: analysis.media.resolution,
-    videoSettings: analysis.videoSettings,
-    streamSummary: analysis.summary,
-    originalLanguage: analysis.originalLanguage,
-  };
-
-  return summary;
-}
-
 module.exports = {
   analyzeFile,
-  summarizeAnalysis,
 };
