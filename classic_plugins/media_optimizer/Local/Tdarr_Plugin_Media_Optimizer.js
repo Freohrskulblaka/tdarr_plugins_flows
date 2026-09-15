@@ -6,7 +6,7 @@
  * Changelog: ../../../docs/media_optimizer_changelog.md
  */
 
-const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-hevc-bitrate-efficiency-2026-09-15-44';
+const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-sonarr-title-fallback-2026-09-15-45';
 
 function loadOptimizerModules() {
   const path = require('path');
@@ -40,7 +40,7 @@ function details() {
     Type: 'Video, Audio, Subtitle',
     Operation: 'Transcode',
     Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, normalized compatibility tracks, commentary and descriptive-audio handling, subtitle retention and external subtitle import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through Tdarr variables, worker environment variables, or a fallback connection profile. Already-compliant files return no-process with a compact summary instead of reprocessing.',
-    Version: '0.1.3',
+    Version: '0.1.4',
     Tags: 'pre-processing, ffmpeg, media optimizer, configurable',
     Inputs: [
       {

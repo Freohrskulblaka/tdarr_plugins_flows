@@ -18,6 +18,17 @@ function analyzeMediaIdentity(fileNameNoExtension) {
   const resolutionMatch = fileName.match(/(2160p|4k|1080p|720p|480p)/i);
   const imdbId = fileName.match(/\[?imdb-(tt\d+)\]?/i)?.[1] || null;
   const tvdbId = fileName.match(/\[?tvdbid-(\d+)\]?/i)?.[1] || null;
+  const episodePrefix = seasonEpisodeMatch
+    ? fileName.slice(0, seasonEpisodeMatch.index)
+      .replace(/\[?tvdbid-\d+\]?/ig, ' ')
+      .replace(/[._]+/g, ' ')
+      .replace(/[\s-]+$/g, '')
+      .trim()
+    : '';
+  const episodeYearMatch = episodePrefix.match(/^(.*?)[\s([]+((?:19|20)\d{2})[\s)\]]*$/);
+  const episodeName = (episodeYearMatch?.[1] || episodePrefix)
+    .replace(/[\s([{]+$/g, '')
+    .trim();
 
   let mediaType = 'Unknown';
 
@@ -29,8 +40,8 @@ function analyzeMediaIdentity(fileNameNoExtension) {
 
   const mediaIdentity = {
     type: mediaType,
-    name: nameYearMatch?.[1] || '',
-    year: nameYearMatch?.[2] || '',
+    name: nameYearMatch?.[1] || episodeName,
+    year: nameYearMatch?.[2] || episodeYearMatch?.[2] || '',
     season: seasonEpisodeMatch?.[1] || '',
     episode: seasonEpisodeMatch?.[2] || '',
     absoluteEpisode: absoluteEpisodeMatch?.[1] || '',

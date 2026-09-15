@@ -13,12 +13,24 @@ const REQUEST_TIMEOUT_MS = 10000;
 async function resolveOriginalLanguage(context) {
   const lookupMode = context.settings.originalLanguageLookup || 'Filename and Streams Only';
   const arrConnections = context.lookup?.arrConnections || {};
-  const analyzedAudioLanguage = context.analysis.streams.audio.items
+  const analyzedAudioLanguages = context.analysis.streams.audio.items
     .map((stream) => stream.analysis?.audio?.language)
-    .find((language) => language && language !== 'und');
-  const configuredLanguage = normalizeLanguageForVariant(context.settings.languageOrder.audio[0] || 'und');
+    .filter((language) => language && language !== 'und');
+  const firstAudioLanguage = analyzedAudioLanguages[0] || '';
+  const configuredLanguages = context.settings.languageOrder.audio.map(normalizeLanguageForVariant);
+  const configuredAudioLanguage = configuredLanguages.find((language) => analyzedAudioLanguages.includes(language)) || '';
+  const analyzedAudioLanguage = lookupMode === ARR_PROFILE_MODE && configuredAudioLanguage
+    ? configuredAudioLanguage
+    : firstAudioLanguage;
+  const configuredLanguage = configuredLanguages[0] || 'und';
   const localLanguage = analyzedAudioLanguage || configuredLanguage || 'und';
-  const localSource = analyzedAudioLanguage ? 'audioStream' : 'languageOrderFallback';
+  let localSource = 'languageOrderFallback';
+
+  if (analyzedAudioLanguage) {
+    localSource = configuredAudioLanguage && analyzedAudioLanguage !== firstAudioLanguage
+      ? 'configuredAudioStreamFallback'
+      : 'audioStream';
+  }
   const radarrConfigured = Boolean(arrConnections.radarr?.host && arrConnections.radarr?.apiKey);
   const sonarrConfigured = Boolean(arrConnections.sonarr?.host && arrConnections.sonarr?.apiKey);
   const originalLanguage = {
@@ -59,7 +71,25 @@ async function resolveOriginalLanguage(context) {
     const candidates = Array.isArray(responseData) ? responseData : [responseData];
     let mediaData = candidates[0] || null;
 
-    if (request.movieIdentity && candidates.length > 1) {
+    if (request.seriesIdentity) {
+      const exactMatches = candidates.filter((candidate) => {
+        const candidateTitles = [
+          candidate?.title,
+          candidate?.sortTitle,
+          candidate?.cleanTitle,
+          ...(candidate?.alternateTitles || []).map((alternateTitle) => alternateTitle?.title),
+        ]
+          .map((title) => normalizeVariantText(title).replace(/[^a-z0-9]+/g, ' ').trim())
+          .filter(Boolean);
+        const titleMatches = candidateTitles.includes(request.seriesIdentity.normalizedTitle);
+        const yearMatches = !request.seriesIdentity.year
+          || String(candidate?.year || '') === request.seriesIdentity.year;
+
+        return titleMatches && yearMatches;
+      });
+
+      mediaData = exactMatches.length === 1 ? exactMatches[0] : null;
+    } else if (request.movieIdentity && candidates.length > 1) {
       const exactMatch = candidates.find((candidate) => {
         const candidateTitle = normalizeVariantText(candidate?.title)
           .replace(/[^a-z0-9]+/g, ' ')
@@ -107,14 +137,29 @@ function createArrLookupRequest(context, arrConnections, errors) {
   const media = context.analysis.media;
 
   if (media.type === 'TV Show') {
-    if (!media.tvdbId) {
-      errors.push('TVDB ID was not found in the filename; Sonarr lookup skipped.');
-      return null;
-    }
-
     if (!arrConnections.sonarr?.host || !arrConnections.sonarr?.apiKey) {
       errors.push('Sonarr host or API key is missing; series lookup skipped.');
       return null;
+    }
+
+    if (!media.tvdbId) {
+      const normalizedTitle = normalizeVariantText(media.name).replace(/[^a-z0-9]+/g, ' ').trim();
+
+      if (!normalizedTitle) {
+        errors.push('TVDB ID and series title were not found in the filename; Sonarr lookup skipped.');
+        return null;
+      }
+
+      return {
+        source: 'sonarr',
+        connection: arrConnections.sonarr,
+        pathname: '/api/v3/series',
+        query: {includeSeasonImages: 'false'},
+        seriesIdentity: {
+          normalizedTitle,
+          year: String(media.year || ''),
+        },
+      };
     }
 
     return {
@@ -122,6 +167,7 @@ function createArrLookupRequest(context, arrConnections, errors) {
       connection: arrConnections.sonarr,
       pathname: '/api/v3/series',
       query: {tvdbId: media.tvdbId, includeSeasonImages: 'false'},
+      seriesIdentity: null,
       movieIdentity: null,
     };
   }

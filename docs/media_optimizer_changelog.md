@@ -6,6 +6,14 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ## 2026-09-15 - Freohrskulblaka
 
+### Added Sonarr title fallback for episodes without TVDB IDs
+
+Changed TV-show original-language lookup to derive a normalized series title and optional year from standard and dotted episode filenames. When a TVDB ID is unavailable, the plugin now checks the configured Sonarr library and accepts only one exact title-and-year match, or one exact title match when the filename has no year. Ambiguous and unmatched results remain unresolved instead of accepting the first Sonarr response.
+
+Arr-mode local fallback now prefers the first configured audio language that is actually present instead of assuming the first stream is the original language. When no configured language is present, the first usable audio stream remains the safety fallback. The plugin version is now `0.1.4`.
+
+Runtime marker: `media-optimizer-sonarr-title-fallback-2026-09-15-45`.
+
 ### Applied HEVC bitrate efficiency during H.264 conversion
 
 Changed same-resolution H.264-to-HEVC planning to use 65% of the lower source or profile bitrate baseline. High-bitrate sources therefore use 65% of the selected resolution profile, while already-compressed sources use 65% of their current video bitrate instead of being transcoded at effectively the same bitrate.
