@@ -5,32 +5,30 @@
  * Description: Resolves named Media Optimizer profiles into validated runtime settings.
  */
 
-const PROFILE_STATUS = {enabled: 'enabled', disabled: 'disabled', invalid: 'invalid'};
-
 const VIDEO_PROFILES = {
-  Balanced: { status: PROFILE_STATUS.enabled, encoderPreset: 'slow', bitDepth: '10-Bit', fullHdCompressionRate: '0.101', fourKCompressionRate: '0.08' },
-  'Archive Quality': { status: PROFILE_STATUS.enabled, encoderPreset: 'slow', bitDepth: '10-Bit', fullHdCompressionRate: '0.12', fourKCompressionRate: '0.10' },
-  'Smaller Files': { status: PROFILE_STATUS.enabled, encoderPreset: 'medium', bitDepth: '10-Bit', fullHdCompressionRate: '0.08', fourKCompressionRate: '0.06' },
+  Balanced: {encoderPreset: 'slow', bitDepth: '10-Bit', fullHdCompressionRate: '0.101', fourKCompressionRate: '0.08'},
+  'Archive Quality': {encoderPreset: 'slow', bitDepth: '10-Bit', fullHdCompressionRate: '0.12', fourKCompressionRate: '0.10'},
+  'Smaller Files': {encoderPreset: 'medium', bitDepth: '10-Bit', fullHdCompressionRate: '0.08', fourKCompressionRate: '0.06'},
 };
 
 const VIDEO_RESOLUTION_PROFILES = {
-  'Keep Native Resolution': { status: PROFILE_STATUS.enabled, upscaleTo1080p: false, downscale4k: false },
-  'Upscale Below 1080p': { status: PROFILE_STATUS.enabled, upscaleTo1080p: true, downscale4k: false },
-  'Downscale 4K to 1080p': { status: PROFILE_STATUS.enabled, upscaleTo1080p: false, downscale4k: true },
-  'Normalize to 1080p': { status: PROFILE_STATUS.enabled, upscaleTo1080p: true, downscale4k: true },
+  'Keep Native Resolution': {upscaleTo1080p: false, downscale4k: false},
+  'Upscale Below 1080p': {upscaleTo1080p: true, downscale4k: false},
+  'Downscale 4K to 1080p': {upscaleTo1080p: false, downscale4k: true},
+  'Normalize to 1080p': {upscaleTo1080p: true, downscale4k: true},
 };
 
 const VIDEO_CODEC_PROFILES = {
-  'H.265 / HEVC - NVIDIA GPU': { status: PROFILE_STATUS.enabled, targetCodec: 'hevc', encoder: 'hevc_nvenc', encoderFamily: 'nvidia' },
-  'H.265 / HEVC - CPU': { status: PROFILE_STATUS.enabled, targetCodec: 'hevc', encoder: 'libx265', encoderFamily: 'cpu' },
-  'H.265 / HEVC - Intel GPU': { status: PROFILE_STATUS.enabled, targetCodec: 'hevc', encoder: 'hevc_qsv', encoderFamily: 'intel' },
-  'H.265 / HEVC - AMD GPU': { status: PROFILE_STATUS.enabled, targetCodec: 'hevc', encoder: 'hevc_amf', encoderFamily: 'amd' },
-  'Copy Video': { status: PROFILE_STATUS.enabled, targetCodec: 'copy', encoder: 'copy', encoderFamily: 'copy' },
+  'H.265 / HEVC - NVIDIA GPU': {targetCodec: 'hevc', encoder: 'hevc_nvenc', encoderFamily: 'nvidia'},
+  'H.265 / HEVC - CPU': {targetCodec: 'hevc', encoder: 'libx265', encoderFamily: 'cpu'},
+  'H.265 / HEVC - Intel GPU': {targetCodec: 'hevc', encoder: 'hevc_qsv', encoderFamily: 'intel'},
+  'H.265 / HEVC - AMD GPU': {targetCodec: 'hevc', encoder: 'hevc_amf', encoderFamily: 'amd'},
+  'Copy Video': {targetCodec: 'copy', encoder: 'copy', encoderFamily: 'copy'},
 };
 
 const HDR_HANDLING_PROFILES = {
-  'Auto Preserve HDR': { status: PROFILE_STATUS.enabled, hdrPolicy: 'autoPreserve' },
-  'Copy HDR Video': { status: PROFILE_STATUS.enabled, hdrPolicy: 'copyHdr' },
+  'Auto Preserve HDR': {hdrPolicy: 'autoPreserve'},
+  'Copy HDR Video': {hdrPolicy: 'copyHdr'},
 };
 
 const AUDIO_PROFILES = {
@@ -55,40 +53,16 @@ const METADATA_PROFILES = {
 };
 
 function createProfileConfig(inputs) {
-  const resolvedProfiles = resolveProfiles(inputs);
-  const profileSettings = createProfileSettings(resolvedProfiles.profiles);
-  const profileConfig = {
-    profiles: resolvedProfiles.profiles,
-    messages: {
-      validationErrors: resolvedProfiles.validationErrors,
-      disabledReasons: resolvedProfiles.disabledReasons,
-    },
-    settings: profileSettings,
-  };
-
-  return profileConfig;
-}
-
-function resolveProfiles(inputs) {
+  const validationErrors = [];
   const resolveSelectedProfile = (profileMap, selectedName, inputName) => {
     const profile = profileMap[selectedName];
 
     if (!profile) {
-      const invalidProfile = {
-        status: PROFILE_STATUS.invalid,
-        invalidReasons: [`Invalid ${inputName}: ${selectedName}`],
-        disabledReasons: [],
-      };
-
-      return invalidProfile;
+      validationErrors.push(`Invalid ${inputName}: ${selectedName || '(empty)'}`);
+      return {};
     }
 
-    const resolvedProfile = Object.assign({}, profile, {
-      invalidReasons: profile.invalidReasons || [],
-      disabledReasons: profile.disabledReasons || [],
-    });
-
-    return resolvedProfile;
+    return {...profile};
   };
 
   const codecProfile = resolveSelectedProfile(VIDEO_CODEC_PROFILES, inputs.videoCodec, 'videoCodec');
@@ -98,70 +72,26 @@ function resolveProfiles(inputs) {
   const audioProfile = resolveSelectedProfile(AUDIO_PROFILES, inputs.audioProfile, 'audioProfile');
   const subtitleProfile = resolveSelectedProfile(SUBTITLE_PROFILES, inputs.subtitleProfile, 'subtitleProfile');
   const metadataProfile = resolveSelectedProfile(METADATA_PROFILES, inputs.metadataProfile, 'metadataProfile');
-  const invalidVideoReasons = [...qualityProfile.invalidReasons, ...resolutionProfile.invalidReasons, ...codecProfile.invalidReasons, ...hdrProfile.invalidReasons];
-  const disabledVideoReasons = [...qualityProfile.disabledReasons, ...resolutionProfile.disabledReasons, ...codecProfile.disabledReasons, ...hdrProfile.disabledReasons];
-  const resolvedStatus = disabledVideoReasons.length > 0 ? PROFILE_STATUS.disabled : PROFILE_STATUS.enabled;
-  let videoProfile;
-
-  if (invalidVideoReasons.length > 0) {
-    videoProfile = {
-      status: PROFILE_STATUS.invalid,
-      invalidReasons: invalidVideoReasons,
-      disabledReasons: [],
-    };
-  } else if (codecProfile.targetCodec === 'copy') {
-    videoProfile = Object.assign({}, qualityProfile, resolutionProfile, codecProfile, hdrProfile, {
-      status: resolvedStatus,
-      disabledReasons: disabledVideoReasons,
+  const videoProfile = {
+    ...qualityProfile,
+    ...resolutionProfile,
+    ...codecProfile,
+    ...hdrProfile,
+    ...(codecProfile.targetCodec === 'copy' ? {
       encoderPreset: 'copy',
       bitDepth: 'source',
-    });
-  } else {
-    videoProfile = Object.assign({}, qualityProfile, resolutionProfile, codecProfile, hdrProfile, {
-      status: resolvedStatus,
-      invalidReasons: invalidVideoReasons,
-      disabledReasons: disabledVideoReasons,
-    });
-  }
-
-  const profiles = {
-    video: videoProfile,
-    audio: audioProfile,
-    subtitle: subtitleProfile,
-    metadata: metadataProfile,
-  };
-  const validationErrors = [...videoProfile.invalidReasons, ...audioProfile.invalidReasons, ...subtitleProfile.invalidReasons, ...metadataProfile.invalidReasons];
-  const disabledReasons = [...videoProfile.disabledReasons, ...audioProfile.disabledReasons, ...subtitleProfile.disabledReasons, ...metadataProfile.disabledReasons];
-
-  const resolvedProfiles = {
-    profiles,
-    validationErrors,
-    disabledReasons,
+    } : {}),
   };
 
-  return resolvedProfiles;
-}
-
-function createProfileSettings(profiles) {
-  const settings = {};
-  const profileStateKeys = ['status', 'invalidReasons', 'disabledReasons'];
-
-  Object.keys(profiles || {}).forEach((profileName) => {
-    const profile = profiles[profileName] || {};
-    const profileSettings = {};
-
-    Object.keys(profile).forEach((key) => {
-      const isProfileState = profileStateKeys.includes(key);
-
-      if (!isProfileState) {
-        profileSettings[key] = profile[key];
-      }
-    });
-
-    settings[profileName] = profileSettings;
-  });
-
-  return settings;
+  return {
+    messages: {validationErrors},
+    settings: {
+      video: videoProfile,
+      audio: audioProfile,
+      subtitle: subtitleProfile,
+      metadata: metadataProfile,
+    },
+  };
 }
 
 module.exports = {

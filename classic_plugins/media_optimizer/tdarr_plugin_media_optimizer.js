@@ -6,7 +6,7 @@
  * Changelog: ../../docs/media_optimizer_changelog.md
  */
 
-const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-arr-profile-2026-08-05-38';
+const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-runtime-2026-09-15-39';
 const { loadInputs, prepareConfig, createContext } = require('./media_optimizer/runtime/config');
 const { createResponse } = require('./media_optimizer/runtime/response');
 const { runInPlaceActions } = require('./media_optimizer/pipeline/actions');
@@ -321,13 +321,6 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
   context.log.info('Resolved settings', context.settings);
   if (config.isInvalid) {
     context.log.error('Configuration is invalid', config.messages.validationErrors);
-    return createResponse(context);
-  }
-
-  if (config.messages.disabledReasons.length > 0) {
-    context.log.warn('Selected profile is scaffolded but disabled', {
-      disabledReasons: config.messages.disabledReasons,
-    });
     return createResponse(context);
   }
 

@@ -6,6 +6,14 @@ History of `../classic_plugins/media_optimizer/tdarr_plugin_media_optimizer.js` 
 
 ## 2026-09-15 - Freohrskulblaka
 
+### Hardened and simplified runtime configuration
+
+Runtime input parsing now canonicalizes recognized choices, booleans, and language aliases before planning. Malformed booleans, lookup modes, log levels, language tokens, and profile names produce controlled configuration errors, with invalid dry-run values failing closed to dry-run mode instead of enabling processing.
+
+Removed retired disabled-profile state, duplicate context response fields, and unused configuration copies. Logging now uses a direct level-to-entry map, and the Tdarr methods adapter no longer hides dependency failures raised after a candidate helper has been resolved.
+
+Runtime marker: `media-optimizer-runtime-2026-09-15-39`.
+
 ### Simplified pipeline orchestration and dry-run handling
 
 Consolidated plan section processing, removed the unused duplicate FFmpeg argument list, and moved analysis and command-preview formatting into the formatting pipeline. Analysis now remains limited to source facts while command construction remains limited to execution arguments.

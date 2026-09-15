@@ -6,19 +6,19 @@
  */
 
 function loadTdarrMethodsLib() {
-  const candidatePaths = [];
+  const candidatePaths = [
+    '../methods/lib',
+    '../../methods/lib',
+    '../../../methods/lib',
+    '../../../../methods/lib',
+  ];
   const errors = [];
-  let parentPath = '..';
-
-  for (let depth = 1; depth <= 4; depth += 1) {
-    candidatePaths.push(`${parentPath}/methods/lib`);
-    parentPath = `../${parentPath}`;
-  }
 
   for (const candidatePath of candidatePaths) {
+    let resolvedPath;
+
     try {
-      const resolvedPath = require.resolve(candidatePath);
-      return require(resolvedPath)();
+      resolvedPath = require.resolve(candidatePath);
     } catch (error) {
       if (error && error.code === 'MODULE_NOT_FOUND') {
         errors.push(`${candidatePath}: ${error.message}`);
@@ -27,6 +27,8 @@ function loadTdarrMethodsLib() {
 
       throw error;
     }
+
+    return require(resolvedPath)();
   }
 
   throw new Error(`Unable to load Tdarr methods/lib from Media Optimizer package. Tried: ${errors.join(' | ')}`);

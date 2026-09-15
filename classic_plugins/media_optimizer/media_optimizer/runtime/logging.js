@@ -8,30 +8,24 @@
  * - 2026-06-29 - Freohrskulblaka: Created logging helpers with summary, normal, and debug log-level handling.
  */
 
+const LOG_ENTRY_LEVELS = ['section', 'info', 'summary', 'warn', 'error', 'debug'];
+const LOG_LEVEL_ENTRIES = {
+  summary: new Set(['section', 'summary', 'warn', 'error']),
+  normal: new Set(['section', 'info', 'summary', 'warn', 'error']),
+  debug: new Set(LOG_ENTRY_LEVELS),
+};
+
 function createLog(logLevel) {
   const entries = [];
   const resolvedLogLevel = logLevel || 'normal';
-  const validLogLevels = ['summary', 'normal', 'debug'];
-  const validEntryLevels = ['section', 'info', 'summary', 'warn', 'error', 'debug'];
+  const enabledEntries = LOG_LEVEL_ENTRIES[resolvedLogLevel];
 
-  if (!validLogLevels.includes(resolvedLogLevel)) {
+  if (!enabledEntries) {
     throw new Error(`Invalid log level: ${resolvedLogLevel}`);
   }
 
-  const shouldLog = (level) => {
-    if (!validEntryLevels.includes(level)) {
-      throw new Error(`Invalid log entry level: ${level}`);
-    }
-
-    const shouldLogSummary = resolvedLogLevel === 'summary' && level !== 'info' && level !== 'debug';
-    const shouldLogNormal = resolvedLogLevel === 'normal' && level !== 'debug';
-    const shouldLogDebug = resolvedLogLevel === 'debug';
-
-    return shouldLogSummary || shouldLogNormal || shouldLogDebug;
-  };
-
   const addEntry = (level, message, data) => {
-    if (!shouldLog(level)) {
+    if (!enabledEntries.has(level)) {
       return;
     }
 
@@ -40,7 +34,7 @@ function createLog(logLevel) {
     entries.push(entry);
   };
 
-  const log = validEntryLevels.reduce((logger, level) => {
+  const log = LOG_ENTRY_LEVELS.reduce((logger, level) => {
     logger[level] = (message, data) => addEntry(level, message, data);
     return logger;
   }, {});
