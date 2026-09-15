@@ -3,14 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-06-29
  * Description: Builds the normalized file, media, stream, chapter, metadata, and original-language inventory used by the media optimizer workflow.
- * Updates:
- * - 2026-06-29 - Freohrskulblaka: Created analysis helpers for media optimizer classic plugin and future flow components.
- * - 2026-07-01 - Freohrskulblaka: Added normalized video stream facts for image classification, bitrate, frame rate, resolution, and HDR.
- * - 2026-07-01 - Freohrskulblaka: Moved video-specific stream enrichment into the video analysis library.
- * - 2026-07-13 - Freohrskulblaka: Extracted file, attachment, chapter, and media identity source facts into focused analysis modules.
- * - 2026-07-15 - Freohrskulblaka: Moved metadata source facts into a focused analysis module.
- * - 2026-08-04 - Freohrskulblaka: Passed FFprobe chapter data into chapter analysis for Tdarr cache-output detection.
- * - 2026-08-04 - Freohrskulblaka: Passed file context into chapter analysis for direct chapter probing.
  */
 
 const { analyzeAttachmentStreams } = require('../domains/attachments/analyze');

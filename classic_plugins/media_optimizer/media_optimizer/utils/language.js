@@ -3,8 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-10
  * Description: Normalizes language values, detects language variants, and builds language labels.
- * Updates:
- * - 2026-07-10 - Freohrskulblaka: Added table-driven language variant rules.
  */
 
 const LANGUAGE_VARIANT_RULES = {

@@ -3,8 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-13
  * Description: Builds normalized movie and episode identity facts from the filename.
- * Updates:
- * - 2026-07-13 - Freohrskulblaka: Extracted media identity facts from the analysis coordinator.
  */
 
 // Filename parsing follows the Radarr/Sonarr naming formats used by this workflow.

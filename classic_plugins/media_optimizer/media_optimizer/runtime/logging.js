@@ -3,9 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-06-29
  * Description: Provides structured log collection and Tdarr infoLog formatting for the media optimizer workflow.
- * Updates:
- * - 2026-08-05 - Freohrskulblaka: Added explicit summary entries so summary mode remains useful without normal info noise.
- * - 2026-06-29 - Freohrskulblaka: Created logging helpers with summary, normal, and debug log-level handling.
  */
 
 const LOG_ENTRY_LEVELS = ['section', 'info', 'summary', 'warn', 'error', 'debug'];

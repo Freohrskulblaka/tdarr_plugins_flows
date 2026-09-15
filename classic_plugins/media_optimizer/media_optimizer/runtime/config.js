@@ -3,10 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-06-29
  * Description: Loads Tdarr inputs, resolves and validates settings, and creates runtime context.
- * Updates:
- * - 2026-06-29 - Freohrskulblaka: Created configuration and context helpers for the media optimizer workflow.
- * - 2026-08-04 - Freohrskulblaka: Added parsing for a single Sonarr/Radarr connection profile input without logging secrets.
- * - 2026-08-04 - Freohrskulblaka: Defaulted classic responses to non-FFmpeg until execution is selected.
  */
 
 const { createLog } = require('./logging');

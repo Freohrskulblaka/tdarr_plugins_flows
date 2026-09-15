@@ -3,11 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-06-30
  * Description: Builds final audio track copy, removal, generation, ordering, and default decisions.
- * Updates:
- * - 2026-06-30 - Freohrskulblaka: Created first-pass audio planning helper for language and channel profile decisions.
- * - 2026-07-07 - Freohrskulblaka: Refined audio planning around language order, commentary removal, 7.1 fallback generation, title normalization, and deterministic defaults.
- * - 2026-07-10 - Freohrskulblaka: Moved source audio classification into the audio analysis library.
- * - 2026-08-05 - Freohrskulblaka: Retag undetermined-language audio to the resolved original or first configured language.
  */
 
 const {

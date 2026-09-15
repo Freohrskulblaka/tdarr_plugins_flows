@@ -3,13 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-06-29
  * Description: Formats media optimizer analysis, plan, and FFmpeg command details into readable Tdarr log output.
- * Updates:
- * - 2026-06-29 - Freohrskulblaka: Created final track table formatting helper.
- * - 2026-06-30 - Freohrskulblaka: Updated formatting for sectioned processing plans.
- * - 2026-07-06 - Freohrskulblaka: Updated video bitrate formatting for nested bitrate profiles.
- * - 2026-07-15 - Freohrskulblaka: Added metadata cleanup detail rendering.
- * - 2026-08-04 - Freohrskulblaka: Added compact no-op summary logging for already-compliant files.
- * - 2026-08-04 - Freohrskulblaka: Hid diagnostic reason breadcrumbs from normal no-op summaries.
  */
 
 function renderFinalTrackTable(plan) {

@@ -3,8 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-13
  * Description: Builds normalized file/container facts for the media optimizer workflow.
- * Updates:
- * - 2026-07-13 - Freohrskulblaka: Extracted file source facts from the analysis coordinator.
  */
 
 function analyzeFileInfo(file) {

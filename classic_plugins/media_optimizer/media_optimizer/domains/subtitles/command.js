@@ -3,10 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-21
  * Description: Renders embedded subtitle copies and external subtitle imports into FFmpeg arguments.
- * Updates:
- * - 2026-08-04 - Freohrskulblaka: Leave kept embedded subtitles as stream copies; only annotate newly imported external subtitles.
- * - 2026-08-04 - Freohrskulblaka: Apply planned subtitle dispositions during active remuxes while preserving embedded subtitle metadata.
- * - 2026-08-05 - Freohrskulblaka: Render planned forced subtitle dispositions instead of clearing all forced flags.
  */
 
 const { addDisposition, addStreamMetadata, quoteArg } = require('../../utils/command_args');

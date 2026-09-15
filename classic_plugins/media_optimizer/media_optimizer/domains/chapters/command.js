@@ -3,10 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-21
  * Description: Renders kept chapters and generated chapter metadata inputs into FFmpeg arguments.
- * Updates:
- * - 2026-08-05 - Freohrskulblaka: Avoid guessing a previous Tdarr work directory for generated chapter metadata.
- * - 2026-08-04 - Freohrskulblaka: Wrote user-visible generated chapter titles.
- * - 2026-08-04 - Freohrskulblaka: Prefer Tdarr's active job work directory for generated chapter metadata files.
  */
 
 const crypto = require('crypto');

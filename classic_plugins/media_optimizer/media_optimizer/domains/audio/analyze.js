@@ -3,11 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-10
  * Description: Builds normalized audio stream facts for language, variants, channels, codecs, defaults, bitrate, and commentary detection.
- * Updates:
- * - 2026-07-10 - Freohrskulblaka:
- *   - Extracted audio stream classification from the audio planner.
- *   - Reused shared commentary and generalized language variant detection.
- * - 2026-07-13 - Freohrskulblaka: Reused shared analysis utility helpers.
  */
 
 const { getUniqueValues } = require('../../utils/analysis');

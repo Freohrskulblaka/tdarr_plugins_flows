@@ -3,8 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-08-04
  * Description: Runs safe subtitle maintenance actions for files that do not need an FFmpeg processing pass.
- * Updates:
- * - 2026-08-05 - Freohrskulblaka: Repair forced subtitle flags to the planned state during no-op passes.
  */
 
 function cleanupMatchedExternalSubtitleSidecars(context) {

@@ -3,11 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-13
  * Description: Builds normalized attachment stream facts for the media optimizer workflow.
- * Updates:
- * - 2026-07-13 - Freohrskulblaka:
- *   - Extracted attachment source facts from the analysis coordinator.
- *   - Reused shared analysis utility helpers.
- * - 2026-07-15 - Freohrskulblaka: Normalized attachment filenames, MIME types, extensions, and type classification.
  */
 
 const FONT_FORMATS = ['ttf', 'otf', 'ttc', 'woff', 'woff2'];

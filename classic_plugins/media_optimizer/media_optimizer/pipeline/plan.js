@@ -3,14 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-06-29
  * Description: Coordinates media optimizer processing plans from the normalized analysis inventory and domain planning helpers.
- * Updates:
- * - 2026-06-29 - Freohrskulblaka: Created initial no-op planning helper for scaffold verification.
- * - 2026-06-30 - Freohrskulblaka: Replaced no-op planning with coordinated video, audio, subtitle, attachment, chapter, and metadata decisions.
- * - 2026-07-01 - Freohrskulblaka: Added required media stream safeguards for video and audio.
- * - 2026-07-13 - Freohrskulblaka: Extracted attachment and chapter planning into focused planning modules.
- * - 2026-07-15 - Freohrskulblaka: Extracted metadata planning into a focused planning module.
- * - 2026-08-04 - Freohrskulblaka: Suppressed cleanup-only cache output loops in cyclic classic stacks.
- * - 2026-08-04 - Freohrskulblaka: Suppressed genpts-only original-file remux loops.
  */
 
 const { planAttachments } = require('../domains/attachments/plan');

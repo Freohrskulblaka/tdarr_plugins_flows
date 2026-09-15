@@ -3,16 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-13
  * Description: Builds normalized chapter facts for the media optimizer workflow.
- * Updates:
- * - 2026-07-13 - Freohrskulblaka: Extracted chapter source facts from the analysis coordinator.
- * - 2026-08-04 - Freohrskulblaka: Count FFprobe chapters when MediaInfo menu tracks are unavailable on Tdarr cache outputs.
- * - 2026-08-04 - Freohrskulblaka: Count individual MediaInfo Menu timestamp entries as chapters.
- * - 2026-08-04 - Freohrskulblaka: Read Tdarr's nested MediaInfo Menu extra timestamp map.
- * - 2026-08-04 - Freohrskulblaka: Treat a MediaInfo Menu track as chapter evidence even when timestamps are not expanded.
- * - 2026-08-04 - Freohrskulblaka: Count Tdarr/ExifTool chapter metadata from the provided file object.
- * - 2026-08-04 - Freohrskulblaka: Count Tdarr MediaInfo MenuCount metadata as chapter evidence.
- * - 2026-08-04 - Freohrskulblaka: Recognize Tdarr MediaInfo underscore-formatted Menu timestamps.
- * - 2026-08-04 - Freohrskulblaka: Tolerate alternate MediaInfo Menu extra containers from Tdarr scans.
  */
 
 function analyzeChapters(mediaInfoTracks, ffProbeChapters, file) {

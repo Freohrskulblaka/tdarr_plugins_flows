@@ -3,9 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-13
  * Description: Builds attachment copy/removal decisions from normalized attachment analysis facts.
- * Updates:
- * - 2026-07-13 - Freohrskulblaka: Extracted attachment planning from the planning coordinator.
- * - 2026-07-15 - Freohrskulblaka: Planned attachments from normalized attachment facts and added attachment counts.
  */
 
 function planAttachments(context) {

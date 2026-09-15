@@ -3,14 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-10
  * Description: Builds normalized subtitle stream facts for language, type, defaults, forced flags, and commentary detection.
- * Updates:
- * - 2026-07-10 - Freohrskulblaka: Extracted subtitle source classification from the subtitle planner.
- * - 2026-07-13 - Freohrskulblaka:
- *   - Added subtitle richness facts and external SRT source inventory.
- *   - Limited external SRT discovery to sidecars matching the current media filename.
- *   - Reused shared analysis utility helpers.
- * - 2026-07-15 - Freohrskulblaka: Counted external SRT cue rows for duplicate-import checks.
- * - 2026-08-05 - Freohrskulblaka: Detect forced subtitle intent from title and sidecar filename text.
  */
 
 const fs = require('fs');

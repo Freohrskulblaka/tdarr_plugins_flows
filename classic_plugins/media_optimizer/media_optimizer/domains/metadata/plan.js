@@ -3,10 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-15
  * Description: Builds metadata cleanup decisions for global tags, file/video titles, and extra tag/data streams.
- * Updates:
- * - 2026-07-15 - Freohrskulblaka: Added focused metadata cleanup planning from normalized metadata facts.
- * - 2026-08-04 - Freohrskulblaka: Ignored unavoidable FFmpeg encoder-only tags on Tdarr cache outputs.
- * - 2026-08-04 - Freohrskulblaka: Ignored unavoidable FFmpeg encoder tags for all cleanup planning.
  */
 
 function planMetadata(context) {

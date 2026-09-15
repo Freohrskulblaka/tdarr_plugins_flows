@@ -3,9 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-01
  * Description: Builds normalized video stream facts for image classification, bitrate, frame rate, resolution, and HDR.
- * Updates:
- * - 2026-07-01 - Freohrskulblaka: Extracted video analysis from the main analysis orchestrator.
- * - 2026-07-13 - Freohrskulblaka: Reused shared analysis utility helpers.
  */
 
 const { getUniqueValues } = require('../../utils/analysis');

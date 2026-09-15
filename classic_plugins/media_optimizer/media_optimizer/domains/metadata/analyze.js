@@ -3,8 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-15
  * Description: Builds normalized metadata facts for global tags, titles, and extra tag/data streams.
- * Updates:
- * - 2026-07-15 - Freohrskulblaka: Added focused metadata source facts for metadata planning.
  */
 
 function analyzeMetadata(streams, formatTags) {

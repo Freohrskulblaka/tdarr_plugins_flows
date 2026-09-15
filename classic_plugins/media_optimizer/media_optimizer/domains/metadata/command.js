@@ -3,8 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-21
  * Description: Renders planned global and stream metadata cleanup into FFmpeg output arguments.
- * Updates:
- * - 2026-08-04 - Freohrskulblaka: Strip global metadata without removing generated chapter titles.
  */
 
 const { quoteArg } = require('../../utils/command_args');

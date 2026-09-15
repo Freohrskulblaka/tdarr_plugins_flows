@@ -3,8 +3,6 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-07-10
  * Description: Detects commentary and descriptive track intent from stream dispositions and titles.
- * Updates:
- * - 2026-07-10 - Freohrskulblaka: Added shared commentary and descriptive track detection.
  */
 
 const { normalizeVariantText } = require('./language');
