@@ -3,26 +3,13 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-06-30
  * Description: Builds video processing decisions from normalized analysis and video profile settings.
- * Updates:
- * - 2026-06-30 - Freohrskulblaka:
- *   - Created first-pass video planning helper for copy/transcode/remove decisions.
- *   - Added image-stream classification and primary playback stream selection.
- * - 2026-07-01 - Freohrskulblaka:
- *   - Added HDR, resolution class, and target bitrate planning facts.
- *   - Updated bitrate planning to consume normalized analysis facts.
- * - 2026-07-06 - Freohrskulblaka:
- *   - Limited target bitrate planning to the primary playback video stream.
- *   - Nested bitrate options and selected bitrate profile.
- *   - Refactored video decisions to return planned track objects.
- *   - Mirrored current 4K, HDR signaling, NVENC rate-control, and pixel-format planning.
- * - 2026-07-15 - Freohrskulblaka:
- *   - Tightened target-compression-rate parity for preserved 4K and invalid frame-rate handling.
  */
 
 function planVideo(context) {
   const videoStreams = context.analysis.streams.video.items;
   const tracks = [];
   const reasons = [];
+  let outputIndex = 0;
 
   if (videoStreams.length === 0) {
     reasons.push('No video streams were found.');
@@ -36,10 +23,15 @@ function planVideo(context) {
     return { tracks, reasons, shouldProcess: false };
   }
 
-  videoStreams.forEach((stream, streamIndex) => {
+  videoStreams.forEach((stream) => {
     const isPrimaryVideo = primaryVideoStream && stream.index === primaryVideoStream.index;
-    const track = createVideoTrack(context, stream, streamIndex, isPrimaryVideo);
+    const track = createVideoTrack(context, stream, isPrimaryVideo);
     const trackDecision = applyVideoTrackDecision(track, context, isPrimaryVideo);
+
+    if (trackDecision.action !== 'remove') {
+      trackDecision.outputIndex = outputIndex;
+      outputIndex += 1;
+    }
 
     tracks.push(trackDecision);
     reasons.push(...trackDecision.reasons);
@@ -85,9 +77,9 @@ function selectPrimaryVideoStream(videoStreams) {
   return primaryStream;
 }
 
-function createVideoTrack(context, stream, outputIndex, isPrimaryVideo) {
+function createVideoTrack(context, stream, isPrimaryVideo) {
   const streamFacts = stream.analysis || {};
-  const bitrateInfo = streamFacts.bitRate || { value: 0, source: 'missing', isEstimated: true };
+  const bitrateInfo = streamFacts.bitRate || { value: 0, source: 'missing' };
   const frameRateInfo = streamFacts.frameRate || { value: 0, source: 'missing' };
   const sourceCodec = stream.codec_name || 'unknown';
   const bitrate = isPrimaryVideo
@@ -98,13 +90,13 @@ function createVideoTrack(context, stream, outputIndex, isPrimaryVideo) {
       bitRate: bitrateInfo.value,
       bitrateSource: bitrateInfo.source,
       frameRateSource: frameRateInfo.source,
-      isEstimated: bitrateInfo.isEstimated,
+      resolution: streamFacts.resolution || {},
       settings: context.settings.video,
     })
     : null;
   const track = {
     sourceIndex: stream.index,
-    outputIndex,
+    outputIndex: null,
     codec: normalizeVideoCodec(sourceCodec),
     sourceCodec,
     targetCodec: normalizeVideoCodec(context.settings.video.targetCodec),
@@ -121,7 +113,6 @@ function createVideoTrack(context, stream, outputIndex, isPrimaryVideo) {
     default: isPrimaryVideo,
     reasons: [],
     ffmpeg: {
-      map: `0:${stream.index}`,
       codec: 'copy',
       filters: [],
       args: [],
@@ -148,7 +139,7 @@ function applyVideoTrackDecision(track, context, isPrimaryVideo) {
     });
   }
 
-  if (settings.targetCodec === 'copy' || settings.mode === 'copy') {
+  if (settings.targetCodec === 'copy') {
     return Object.assign({}, track, {
       action: 'copy',
       reasons: ['Video profile is configured to copy video.'],
@@ -163,7 +154,6 @@ function applyVideoTrackDecision(track, context, isPrimaryVideo) {
 function applyVideoCompatibilityDecision(track, context) {
   const settings = context.settings.video;
   const ffmpeg = {
-    map: track.ffmpeg.map,
     codec: track.ffmpeg.codec,
     filters: track.ffmpeg.filters.slice(),
     args: track.ffmpeg.args.slice(),
@@ -173,19 +163,26 @@ function applyVideoCompatibilityDecision(track, context) {
   let action = track.action;
   const codecMatches = normalizeVideoCodec(track.codec) === normalizeVideoCodec(settings.targetCodec);
   const shouldUpscale = settings.upscaleTo1080p && track.resolution.isLowRes;
-  const shouldDownscale4k = !settings.preserve4k && track.resolution.is4k;
-  const shouldPreserve4k = settings.preserve4k && track.resolution.is4k;
+  const shouldDownscale4k = settings.downscale4k && track.resolution.is4k;
+  const selectedBitrate = shouldUpscale || shouldDownscale4k ? bitrate.fullHd : bitrate.native;
 
-  bitrate.selected = selectVideoBitrateProfile({
-    bitrate,
-    shouldUpscale,
-    shouldDownscale4k,
-    shouldPreserve4k,
-  });
+  bitrate.selected = Object.assign({}, selectedBitrate);
 
-  const shouldTranscodeForBitrate = !bitrate.current.isEstimated
-    && bitrate.selected.maxKbps > 0
-    && bitrate.current.kbps > bitrate.selected.maxKbps;
+  if (!codecMatches && bitrate.current.kbps > 0 && bitrate.selected.targetKbps > bitrate.current.kbps) {
+    const cappedTargetKbps = roundToNearestHundred(bitrate.current.kbps);
+    bitrate.selected = Object.assign({}, bitrate.selected, {
+      targetKbps: cappedTargetKbps,
+      maxKbps: roundToNearestHundred(cappedTargetKbps * 1.25),
+      isSourceCapped: true,
+    });
+  }
+
+  if (!bitrate.selected.isCalculable) {
+    reasons.push('Video target bitrate could not be calculated; the video will be copied without codec or resolution changes.');
+    return Object.assign({}, track, { action: 'copy', bitrate, ffmpeg, reasons });
+  }
+
+  const shouldTranscodeForBitrate = bitrate.current.kbps > bitrate.selected.maxKbps;
 
   if (!codecMatches) {
     action = 'transcode';
@@ -195,37 +192,31 @@ function applyVideoCompatibilityDecision(track, context) {
   if (shouldUpscale) {
     action = 'transcode';
     reasons.push('Video is below 1080p and upscale-to-1080p is enabled.');
-    ffmpeg.filters.push('scale=1920:1080:flags=lanczos');
+    ffmpeg.filters.push('scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos');
+    ffmpeg.filters.push('setsar=1');
   }
 
   if (shouldDownscale4k) {
     action = 'transcode';
-    reasons.push('Video is 4K and the selected profile does not preserve 4K resolution.');
-    ffmpeg.filters.push('scale=1920:1080:flags=lanczos');
+    reasons.push('Video is 4K and the selected resolution policy limits output to 1080p.');
+    ffmpeg.filters.push('scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos');
+    ffmpeg.filters.push('setsar=1');
   }
 
-  if (shouldPreserve4k) {
-    reasons.push('Video is 4K and will be kept at native 4K resolution.');
-  }
-
-  if (shouldTranscodeForBitrate && !shouldUpscale && !shouldDownscale4k) {
+  if (shouldTranscodeForBitrate) {
     action = 'transcode';
     reasons.push(`Video bitrate ${bitrate.current.kbps}k from ${bitrate.current.source} is above target maximum ${bitrate.selected.maxKbps}k.`);
   }
 
-  if (!bitrate.selected.isCalculable) {
-    reasons.push('Video target bitrate could not be calculated because width, height, frame rate, or target compression rate is missing.');
-  }
-
-  if (bitrate.current.isEstimated) {
-    reasons.push('Video bitrate is a file-level estimate; bitrate-only transcode decisions are skipped.');
+  if (bitrate.selected.isSourceCapped) {
+    reasons.push(`Video target was capped at the source video bitrate of ${bitrate.selected.targetKbps}k to prevent file growth.`);
   }
 
   if (action === 'transcode') {
     const encoderArgs = createVideoEncoderArgs({ track, settings, bitrate });
 
     if (track.hdr.isHdr && settings.hdrPolicy === 'preserveSignaling') {
-      reasons.push('HDR was detected; basic HDR signaling will be written during transcode.');
+      reasons.push(`${track.hdr.format.toUpperCase()} HDR was detected; source color signaling will be written during transcode.`);
     }
 
     ffmpeg.codec = settings.encoder;
@@ -244,153 +235,46 @@ function applyVideoCompatibilityDecision(track, context) {
   return trackDecision;
 }
 
-function selectVideoBitrateProfile({ bitrate, shouldUpscale, shouldDownscale4k, shouldPreserve4k }) {
-  let selectedProfile = bitrate.native;
-
-  if (shouldUpscale || shouldDownscale4k) {
-    selectedProfile = bitrate.fullHd;
-  } else if (shouldPreserve4k) {
-    selectedProfile = bitrate.native;
-  }
-
-  return selectedProfile;
-}
-
 function createVideoEncoderArgs({ track, settings, bitrate }) {
-  const args = [];
-  const rateControlArgs = createVideoRateControlArgs({ settings, bitrate });
-  const profileArgs = createVideoProfileArgs(settings);
-  const hdrArgs = createVideoHdrArgs(track, settings);
-
-  args.push(...rateControlArgs);
-
-  if (settings.encoderFamily === 'nvidia') {
-    args.push('-spatial_aq:v', '1');
-    args.push('-aq-strength:v', '15');
-    args.push('-temporal-aq', '1');
-    args.push('-bf', '5');
-    args.push('-preset:v', settings.encoderPreset);
-    args.push('-tune:v', 'hq');
-  } else if (settings.encoderFamily === 'amd') {
-    args.push('-quality', resolveAmdQualityPreset(settings.encoderPreset));
-  } else {
-    args.push('-preset', settings.encoderPreset);
-  }
-
-  args.push(...profileArgs);
-  args.push(...hdrArgs);
-
-  return args;
-}
-
-function createVideoRateControlArgs({ settings, bitrate }) {
-  const args = [];
   const selectedBitrate = bitrate.selected;
-  const bufferSizeKbps = bitrate.current.kbps > 0 ? bitrate.current.kbps : selectedBitrate.maxKbps;
-
-  if (settings.encoderFamily === 'nvidia') {
-    args.push('-cq:v', '19');
-    args.push('-b:v', `${selectedBitrate.targetKbps}k`);
-    args.push('-minrate', `${selectedBitrate.minKbps}k`);
-    args.push('-maxrate', `${selectedBitrate.maxKbps}k`);
-    args.push('-bufsize', `${bufferSizeKbps}k`);
-    args.push('-rc:v', 'vbr');
-    args.push('-rc-lookahead:v', '32');
-    return args;
-  }
-
-  args.push('-b:v', `${selectedBitrate.targetKbps}k`);
-  args.push('-maxrate', `${selectedBitrate.maxKbps}k`);
-  args.push('-bufsize', `${bufferSizeKbps}k`);
-
-  if (settings.encoderFamily === 'cpu') {
-    args.push('-minrate', `${selectedBitrate.minKbps}k`);
-  }
-
-  return args;
-}
-
-function resolveAmdQualityPreset(encoderPreset) {
   const qualityMap = {
     slow: 'quality',
     medium: 'balanced',
     fast: 'speed',
   };
-  const qualityPreset = qualityMap[encoderPreset] || 'quality';
+  const wantsTenBit = settings.bitDepth === '10-Bit';
+  const familyArgs = {
+    nvidia: ['-cq:v', '19', '-rc:v', 'vbr', '-rc-lookahead:v', '32', '-spatial_aq:v', '1', '-aq-strength:v', '15', '-temporal-aq', '1', '-bf', '5', '-preset:v', settings.encoderPreset, '-tune:v', 'hq'],
+    intel: ['-preset:v', settings.encoderPreset],
+    amd: ['-rc:v', 'vbr_peak', '-quality', qualityMap[settings.encoderPreset] || 'quality'],
+    cpu: ['-preset:v', settings.encoderPreset],
+  };
+  const pixelFormat = wantsTenBit && settings.encoderFamily === 'cpu' ? 'yuv420p10le' : wantsTenBit ? 'p010le' : 'yuv420p';
+  const args = [
+    '-b:v', `${selectedBitrate.targetKbps}k`,
+    '-maxrate', `${selectedBitrate.maxKbps}k`,
+    '-bufsize', `${roundToNearestHundred(selectedBitrate.targetKbps * 2)}k`,
+    ...(familyArgs[settings.encoderFamily] || []),
+    '-profile:v', wantsTenBit ? 'main10' : 'main',
+    '-pix_fmt', pixelFormat,
+  ];
+  const colorArgs = {
+    colorPrimaries: '-color_primaries',
+    colorTransfer: '-color_trc',
+    colorSpace: '-colorspace',
+  };
 
-  return qualityPreset;
-}
+  if (settings.hdrPolicy === 'preserveSignaling') {
+    Object.entries(colorArgs).forEach(([property, option]) => {
+      const value = track.hdr[property];
 
-function createVideoProfileArgs(settings) {
-  const args = [];
-  const profileSettings = resolveVideoProfileArgs(settings);
-
-  if (profileSettings.profile) {
-    args.push('-profile:v', profileSettings.profile);
-  }
-
-  if (profileSettings.pixelFormat) {
-    args.push('-pix_fmt', profileSettings.pixelFormat);
+      if (value && !['unknown', 'unspecified', 'reserved'].includes(value)) {
+        args.push(option, value);
+      }
+    });
   }
 
   return args;
-}
-
-function resolveVideoProfileArgs(settings) {
-  const encoderFamily = settings.encoderFamily || 'unknown';
-  const targetCodec = settings.targetCodec || 'unknown';
-  const wantsTenBit = settings.bitDepth === '10-Bit';
-  const normalizedProfile = normalizeVideoProfile(settings.encodingProfile, targetCodec, wantsTenBit);
-  const pixelFormat = resolveVideoPixelFormat({ encoderFamily, targetCodec, wantsTenBit });
-  const profileSettings = {
-    profile: normalizedProfile,
-    pixelFormat,
-  };
-
-  return profileSettings;
-}
-
-function normalizeVideoProfile(profile, targetCodec, wantsTenBit) {
-  const normalizedTargetCodec = normalizeVideoCodec(targetCodec);
-  let normalizedProfile = profile || '';
-
-  if (normalizedTargetCodec === 'hevc' && wantsTenBit) {
-    normalizedProfile = 'main10';
-  }
-
-  if (normalizedTargetCodec === 'hevc' && normalizedProfile === 'high') {
-    normalizedProfile = wantsTenBit ? 'main10' : 'main';
-  }
-
-  if (normalizedTargetCodec === 'h264' && normalizedProfile === 'main10') {
-    normalizedProfile = 'high';
-  }
-
-  return normalizedProfile;
-}
-
-function resolveVideoPixelFormat({ encoderFamily, targetCodec, wantsTenBit }) {
-  const hardwareEncoderFamilies = ['nvidia', 'intel', 'amd'];
-  const normalizedTargetCodec = normalizeVideoCodec(targetCodec);
-  let pixelFormat = '';
-
-  if (wantsTenBit && normalizedTargetCodec === 'hevc' && hardwareEncoderFamilies.includes(encoderFamily)) {
-    pixelFormat = 'p010le';
-  }
-
-  if (wantsTenBit && normalizedTargetCodec === 'hevc' && encoderFamily === 'cpu') {
-    pixelFormat = 'yuv420p10le';
-  }
-
-  if (!wantsTenBit && normalizedTargetCodec === 'hevc') {
-    pixelFormat = 'yuv420p';
-  }
-
-  if (!wantsTenBit && normalizedTargetCodec === 'h264') {
-    pixelFormat = 'yuv420p';
-  }
-
-  return pixelFormat;
 }
 
 function normalizeVideoCodec(codec) {
@@ -406,43 +290,33 @@ function normalizeVideoCodec(codec) {
   return normalizedCodec;
 }
 
-function createVideoHdrArgs(track, settings) {
-  const args = [];
-  const shouldPreserveHdr = track.hdr.isHdr && settings.hdrPolicy === 'preserveSignaling';
-
-  if (shouldPreserveHdr) {
-    args.push('-level', '5.1');
-    args.push('-color_primaries', 'bt2020');
-    args.push('-color_trc', 'smpte2084');
-    args.push('-colorspace', 'bt2020nc');
-  }
-
-  return args;
-}
-
-function createBitratePlan({ width, height, frameRate, bitRate, bitrateSource, frameRateSource, isEstimated, settings }) {
-  const createTargetProfile = (name, targetKbps) => {
+function createBitratePlan({ width, height, frameRate, bitRate, bitrateSource, frameRateSource, resolution, settings }) {
+  const createTargetProfile = (name, targetWidth, targetHeight, compressionRate) => {
+    const hasCalculationInputs = targetWidth > 0 && targetHeight > 0 && frameRate > 0 && compressionRate > 0;
+    const targetKbps = hasCalculationInputs
+      ? roundToNearestHundred(((targetWidth * targetHeight * frameRate) * compressionRate) / 1000)
+      : 0;
     const targetProfile = {
       name,
       targetKbps,
-      minKbps: roundToNearestHundred(targetKbps * 0.75),
       maxKbps: roundToNearestHundred(targetKbps * 1.25),
       isCalculable: targetKbps > 0,
     };
 
     return targetProfile;
   };
-  const targetCompressionRate = Number(settings.targetCompressionRate || 0);
-  const adjustedCompressionRate = targetCompressionRate * (normalizeVideoCodec(settings.targetCodec) === 'hevc' ? 0.65 : 1);
+  const fullHdCompressionRate = Number(settings.fullHdCompressionRate || 0);
+  const nativeCompressionRate = resolution.is4k
+    ? Number(settings.fourKCompressionRate || 0)
+    : fullHdCompressionRate;
   const currentKbps = Math.floor(bitRate / 1000);
-  const native = createTargetProfile('native', calculateOptimalBitrate(width, height, frameRate, adjustedCompressionRate));
-  const fullHd = createTargetProfile('fullHd', calculateOptimalBitrate(1920, 1080, frameRate, adjustedCompressionRate));
+  const native = createTargetProfile('native', width, height, nativeCompressionRate);
+  const fullHd = createTargetProfile('fullHd', 1920, 1080, fullHdCompressionRate);
   const bitrate = {
     current: {
       kbps: currentKbps,
       source: bitrateSource,
       frameRateSource,
-      isEstimated: Boolean(isEstimated),
     },
     native,
     fullHd,
@@ -450,18 +324,6 @@ function createBitratePlan({ width, height, frameRate, bitRate, bitrateSource, f
   };
 
   return bitrate;
-}
-
-function calculateOptimalBitrate(width, height, frameRate, targetCompressionRate) {
-  const hasCalculationInputs = width > 0 && height > 0 && frameRate > 0 && targetCompressionRate > 0;
-
-  if (!hasCalculationInputs) {
-    return 0;
-  }
-
-  const optimalBitrate = roundToNearestHundred(((width * height * frameRate) * targetCompressionRate) / 1000);
-
-  return optimalBitrate;
 }
 
 function roundToNearestHundred(value) {

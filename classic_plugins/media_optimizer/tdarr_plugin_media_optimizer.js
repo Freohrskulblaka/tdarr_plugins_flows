@@ -36,23 +36,18 @@ function details() {
           type: 'dropdown',
           options: [
             'H.265 / HEVC - NVIDIA GPU',
-            'H.265 / HEVC - CPU (Disabled)',
-            'H.265 / HEVC - Intel GPU (Disabled)',
-            'H.265 / HEVC - AMD GPU (Disabled)',
-            'H.264 - NVIDIA GPU (Disabled)',
-            'H.264 - CPU (Disabled)',
-            'H.264 - Intel GPU (Disabled)',
-            'H.264 - AMD GPU (Disabled)',
+            'H.265 / HEVC - CPU',
+            'H.265 / HEVC - Intel GPU',
+            'H.265 / HEVC - AMD GPU',
             'Copy Video',
           ],
         },
         tooltip: `
           Select the target video codec and encoder family.\\n
-          H.265 / HEVC - NVIDIA GPU: supported production path. Transcodes video to HEVC using NVENC when the video plan says conversion is needed.\\n
-          H.265 / HEVC - CPU (Disabled): future CPU x265 path. Currently blocks processing with a clear disabled-profile warning.\\n
-          H.265 / HEVC - Intel GPU (Disabled): future Intel QSV path. Currently disabled.\\n
-          H.265 / HEVC - AMD GPU (Disabled): future AMD AMF path. Currently disabled.\\n
-          H.264 options (Disabled): scaffolded future H.264 output paths. Currently disabled.\\n
+          H.265 / HEVC - NVIDIA GPU: uses NVENC hardware encoding.\\n
+          H.265 / HEVC - CPU: uses libx265 on either Intel or AMD processors.\\n
+          H.265 / HEVC - Intel GPU: uses Intel Quick Sync Video.\\n
+          H.265 / HEVC - AMD GPU: uses AMD AMF hardware encoding.\\n
           Copy Video: never transcodes video. Use this when testing audio, subtitle, chapter, or metadata behavior without changing video.\\n
           Example: use H.265 / HEVC - NVIDIA GPU for normal library rollout; use Copy Video for remux-only validation.
         `,
@@ -60,29 +55,43 @@ function details() {
       {
         name: 'videoQualityProfile',
         type: 'string',
-        defaultValue: 'Balanced 1080p',
+        defaultValue: 'Balanced',
         inputUI: {
           type: 'dropdown',
           options: [
-            'Balanced 1080p',
+            'Balanced',
             'Archive Quality',
             'Smaller Files',
-            'Compress 4K Preserve HDR Signaling',
-            'Compress 4K to SDR Experimental (Disabled)',
-            'Skip HDR Transcode (Disabled)',
-            'Copy When Compatible',
           ],
         },
         tooltip: `
-          Select the video quality and resolution policy.\\n
-          Balanced 1080p: default library profile. Uses HEVC main10, 10-bit, slow preset, and a balanced target size for 1080p output.\\n
+          Select the HEVC quality and size target independently from output resolution.\\n
+          Balanced: targets about 5 Mbps for 1080p24 and 16 Mbps for 4K24.\\n
           Archive Quality: keeps a higher target bitrate for files where quality matters more than size.\\n
           Smaller Files: lowers the target bitrate for more aggressive space savings.\\n
-          Compress 4K Preserve HDR Signaling: keeps 4K resolution and writes basic HDR signaling flags when transcoding.\\n
-          Compress 4K to SDR Experimental (Disabled): reserved for future HDR-to-SDR work. Currently disabled.\\n
-          Skip HDR Transcode (Disabled): reserved for future HDR skip logic. Currently disabled.\\n
-          Copy When Compatible: keeps compatible video when the selected codec/profile already matches.\\n
-          Example: Balanced 1080p is the normal choice for mixed libraries; Archive Quality is better for high-value movies.
+          Example: Balanced is the normal choice for mixed libraries; Archive Quality is better for high-value movies.
+        `,
+      },
+      {
+        name: 'videoResolution',
+        type: 'string',
+        defaultValue: 'Upscale Below 1080p',
+        inputUI: {
+          type: 'dropdown',
+          options: [
+            'Keep Native Resolution',
+            'Upscale Below 1080p',
+            'Downscale 4K to 1080p',
+            'Normalize to 1080p',
+          ],
+        },
+        tooltip: `
+          Select the output resolution policy independently from video quality.\\n
+          Keep Native Resolution: keeps the source dimensions.\\n
+          Upscale Below 1080p: fits 720p and smaller video within 1920x1080 while preserving 4K.\\n
+          Downscale 4K to 1080p: fits 4K video within 1920x1080 and leaves lower resolutions unchanged.\\n
+          Normalize to 1080p: upscales lower resolutions and downscales 4K to a 1920x1080 boundary.\\n
+          Resizing always preserves the source aspect ratio.
         `,
       },
       {

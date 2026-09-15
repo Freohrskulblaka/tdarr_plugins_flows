@@ -12,11 +12,13 @@ const { getUniqueValues } = require('../../utils/analysis');
 
 const IMAGE_VIDEO_CODECS = ['mjpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/bmp', 'image/webp', 'image/tiff', 'image/x-ms-bmp'];
 
-function analyzeVideoStreams(videoStreams, mediaInfoTracks, file) {
+function analyzeVideoStreams(videoStreams, mediaInfoTracks, file, durationSeconds) {
   const mediaInfoVideoTracks = mediaInfoTracks.filter((track) => track['@type'] === 'Video');
   const enrichedVideoStreams = videoStreams.map((stream, streamIndex) => {
-    const mediaInfoVideoTrack = mediaInfoVideoTracks[streamIndex] || {};
-    return enrichVideoStream(stream, mediaInfoVideoTrack, file);
+    const mediaInfoVideoTrack = mediaInfoVideoTracks.find((track) => String(track.StreamOrder) === String(stream.index))
+      || mediaInfoVideoTracks[streamIndex]
+      || null;
+    return enrichVideoStream(stream, mediaInfoVideoTrack, file, durationSeconds);
   });
   const videoInfo = {
     items: enrichedVideoStreams,
@@ -30,7 +32,7 @@ function analyzeVideoStreams(videoStreams, mediaInfoTracks, file) {
   return videoInfo;
 }
 
-function enrichVideoStream(stream, mediaInfoVideoTrack, file) {
+function enrichVideoStream(stream, mediaInfoVideoTrack, file, durationSeconds) {
   const resolveIsImageStream = () => {
     const codecName = String(stream.codec_name || '').toLowerCase();
     const codecLongName = String(stream.codec_long_name || '').toLowerCase();
@@ -45,7 +47,7 @@ function enrichVideoStream(stream, mediaInfoVideoTrack, file) {
   };
   const width = Number(stream.width || mediaInfoVideoTrack?.Width || 0);
   const height = Number(stream.height || mediaInfoVideoTrack?.Height || 0);
-  const bitRate = getVideoBitRate(stream, mediaInfoVideoTrack, file);
+  const bitRate = getVideoBitRate(stream, mediaInfoVideoTrack, durationSeconds);
   const frameRate = getVideoFrameRate(stream, mediaInfoVideoTrack, file);
   const enrichedStream = Object.assign({}, stream, {
     analysis: {
@@ -55,46 +57,39 @@ function enrichVideoStream(stream, mediaInfoVideoTrack, file) {
       bitRate,
       frameRate,
       resolution: analyzeVideoResolution(width, height, file),
-      hdr: analyzeVideoHdr(stream),
+      hdr: analyzeVideoHdr(stream, mediaInfoVideoTrack),
     },
   });
 
   return enrichedStream;
 }
 
-function getVideoBitRate(stream, mediaInfoVideoTrack, file) {
-  const estimateFileBitRate = () => {
-    const durationSeconds = Number(mediaInfoVideoTrack?.Duration || file?.meta?.Duration || file?.duration || 0);
-    const fileSizeBytes = Number(file?.file_size || file?.fileSize || 0);
-    const hasEstimateInputs = durationSeconds > 0 && fileSizeBytes > 0;
-
-    if (!hasEstimateInputs) {
-      return 0;
-    }
-
-    const durationMinutes = durationSeconds * 0.0166667;
-    const fileBitRateKbps = fileSizeBytes / (durationMinutes * 0.0075);
-
-    return fileBitRateKbps;
-  };
+function getVideoBitRate(stream, mediaInfoVideoTrack, fileDurationSeconds) {
   const mediaInfoBitRate = Number(mediaInfoVideoTrack?.BitRate || 0);
   const mediaInfoNominalBitRate = Number(mediaInfoVideoTrack?.BitRate_Nominal || 0);
   const streamBitRate = Number(stream.bit_rate || 0);
-  const fileEstimateBitRate = estimateFileBitRate();
+  const streamSize = Number(mediaInfoVideoTrack?.StreamSize
+    || Object.entries(stream.tags || {}).find(([key]) => key.toUpperCase().startsWith('NUMBER_OF_BYTES'))?.[1]
+    || 0);
+  const durationSeconds = Number(mediaInfoVideoTrack?.Duration || stream.duration || fileDurationSeconds || 0);
 
   if (mediaInfoBitRate > 0) {
-    return { value: mediaInfoBitRate, source: 'mediaInfoVideo', isEstimated: false };
-  }
-
-  if (mediaInfoNominalBitRate > 0) {
-    return { value: mediaInfoNominalBitRate, source: 'mediaInfoNominal', isEstimated: false };
+    return { value: mediaInfoBitRate, source: 'mediaInfoVideo' };
   }
 
   if (streamBitRate > 0) {
-    return { value: streamBitRate, source: 'ffprobeStream', isEstimated: false };
+    return { value: streamBitRate, source: 'ffprobeStream' };
   }
 
-  return { value: fileEstimateBitRate, source: 'fileEstimate', isEstimated: true };
+  if (mediaInfoNominalBitRate > 0) {
+    return { value: mediaInfoNominalBitRate, source: 'mediaInfoNominal' };
+  }
+
+  if (streamSize > 0 && durationSeconds > 0) {
+    return { value: (streamSize * 8) / durationSeconds, source: 'videoStreamSize' };
+  }
+
+  return { value: 0, source: 'missing' };
 }
 
 function getVideoFrameRate(stream, mediaInfoVideoTrack, file) {
@@ -139,12 +134,14 @@ function getVideoFrameRate(stream, mediaInfoVideoTrack, file) {
 }
 
 function analyzeVideoResolution(width, height, file) {
-  const is1080p = height >= 972 && height <= 1080 && width >= 1728 && width <= 1920;
-  const is4k = height >= 2160 || file?.video_resolution === '4KUHD';
-  const is720p = height >= 700 && height <= 720;
-  const is480p = height > 0 && height <= 480;
   const isUnknown = width <= 0 || height <= 0;
-  const isLowRes = (height < 972 || width < 1728) && !is1080p;
+  const longEdge = Math.max(width, height);
+  const shortEdge = Math.min(width, height);
+  const is4k = !isUnknown && (longEdge >= 3456 || shortEdge >= 1944);
+  const is1080p = !is4k && !isUnknown && (longEdge >= 1728 || shortEdge >= 972);
+  const is720p = !is1080p && !isUnknown && (longEdge >= 1152 || shortEdge >= 648);
+  const is480p = !is720p && !isUnknown && (longEdge >= 640 || shortEdge >= 432);
+  const isLowRes = !isUnknown && !is1080p && !is4k;
   const resolutionOptions = [
     { matches: is4k, label: '4KUHD' },
     { matches: is1080p, label: '1080p' },
@@ -167,15 +164,14 @@ function analyzeVideoResolution(width, height, file) {
   return resolution;
 }
 
-function analyzeVideoHdr(stream) {
-  const colorPrimaries = stream.color_primaries || '';
-  const colorTransfer = stream.color_transfer || stream.color_trc || '';
-  const colorSpace = stream.color_space || stream.colorspace || '';
-  const isBt2020 = colorPrimaries === 'bt2020';
-  const isPqHdr = colorTransfer === 'smpte2084';
-  const isHdr = isBt2020 || (isBt2020 && isPqHdr && colorSpace === 'bt2020nc');
+function analyzeVideoHdr(stream, mediaInfoVideoTrack) {
+  const colorPrimaries = String(stream.color_primaries || mediaInfoVideoTrack?.colour_primaries || mediaInfoVideoTrack?.ColorPrimaries || '').toLowerCase();
+  const colorTransfer = String(stream.color_transfer || stream.color_trc || mediaInfoVideoTrack?.transfer_characteristics || mediaInfoVideoTrack?.TransferCharacteristics || '').toLowerCase();
+  const colorSpace = String(stream.color_space || stream.colorspace || mediaInfoVideoTrack?.matrix_coefficients || mediaInfoVideoTrack?.Matrix_Coefficients || '').toLowerCase();
+  const format = colorTransfer === 'smpte2084' ? 'pq' : colorTransfer === 'arib-std-b67' ? 'hlg' : '';
   const hdr = {
-    isHdr,
+    isHdr: Boolean(format),
+    format,
     colorPrimaries,
     colorTransfer,
     colorSpace,

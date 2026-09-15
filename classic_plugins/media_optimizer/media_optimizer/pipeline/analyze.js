@@ -28,7 +28,7 @@ function analyzeFile(context) {
   const ffProbeChapters = context.file?.ffProbeData?.chapters || [];
   const fileInfo = analyzeFileInfo(context.file);
   const subtitleInfo = analyzeSubtitles(streams, mediaInfoTracks, fileInfo);
-  const streamInfo = analyzeStreams(streams, mediaInfoTracks, context.file, subtitleInfo.embedded);
+  const streamInfo = analyzeStreams(streams, mediaInfoTracks, context.file, fileInfo.durationSeconds, subtitleInfo.embedded);
   const chapterInfo = analyzeChapters(mediaInfoTracks, ffProbeChapters, context.file);
   const mediaIdentity = analyzeMediaIdentity(fileInfo.nameNoExtension);
   const metadataInfo = analyzeMetadata(streams, context.file?.ffProbeData?.format?.tags || {});
@@ -49,14 +49,14 @@ function analyzeFile(context) {
   return analysis;
 }
 
-function analyzeStreams(streams, mediaInfoTracks, file, subtitleInfo) {
+function analyzeStreams(streams, mediaInfoTracks, file, durationSeconds, subtitleInfo) {
   const videoStreams = streams.filter((stream) => stream.codec_type === 'video');
   const audioStreams = streams.filter((stream) => stream.codec_type === 'audio');
   const attachmentStreams = streams.filter((stream) => stream.codec_type === 'attachment');
 
   const streamInfo = {
     all: streams,
-    video: analyzeVideoStreams(videoStreams, mediaInfoTracks, file),
+    video: analyzeVideoStreams(videoStreams, mediaInfoTracks, file, durationSeconds),
     audio: analyzeAudioStreams(audioStreams, mediaInfoTracks),
     subtitle: subtitleInfo,
     attachment: analyzeAttachmentStreams(attachmentStreams),
