@@ -165,16 +165,41 @@ function analyzeVideoResolution(width, height, file) {
 }
 
 function analyzeVideoHdr(stream, mediaInfoVideoTrack) {
+  const parseNumericMetadata = (value) => Number.parseFloat(String(value || '').replace(/[^\d.].*$/, '')) || 0;
   const colorPrimaries = String(stream.color_primaries || mediaInfoVideoTrack?.colour_primaries || mediaInfoVideoTrack?.ColorPrimaries || '').toLowerCase();
   const colorTransfer = String(stream.color_transfer || stream.color_trc || mediaInfoVideoTrack?.transfer_characteristics || mediaInfoVideoTrack?.TransferCharacteristics || '').toLowerCase();
   const colorSpace = String(stream.color_space || stream.colorspace || mediaInfoVideoTrack?.matrix_coefficients || mediaInfoVideoTrack?.Matrix_Coefficients || '').toLowerCase();
-  const format = colorTransfer === 'smpte2084' ? 'pq' : colorTransfer === 'arib-std-b67' ? 'hlg' : '';
+  const hdrDescription = [
+    mediaInfoVideoTrack?.HDR_Format,
+    mediaInfoVideoTrack?.HDR_Format_Profile,
+    mediaInfoVideoTrack?.HDR_Format_Compatibility,
+    mediaInfoVideoTrack?.HDR_Format_String,
+    ...(stream.side_data_list || []).map((item) => item.side_data_type),
+  ].filter(Boolean).join(' ').toLowerCase();
+  const doviSideData = (stream.side_data_list || []).find((item) => /dovi|dolby vision/i.test(item.side_data_type || '')) || {};
+  const dolbyVisionProfileMatch = hdrDescription.match(/(?:dvhe|dvh1)[._-]?0?(\d+)/i);
+  const dolbyVisionProfile = Number(doviSideData.dv_profile || dolbyVisionProfileMatch?.[1] || 0);
+  const hasDolbyVision = /dolby vision|\bdovi\b|\bdvhe\b|\bdvh1\b/.test(hdrDescription) || dolbyVisionProfile > 0;
+  const hasHdr10Plus = /hdr10\+|smpte\s*st\s*2094(?:-|\s*)40|smpte\s*st\s*2094\s*app\s*4/.test(hdrDescription);
+  const format = /smpte\s*2084|smpte2084|\bpq\b/.test(colorTransfer)
+    ? 'pq'
+    : /arib(?:-std)?-?b67|\bhlg\b/.test(colorTransfer) ? 'hlg' : '';
+  const type = hasDolbyVision ? 'dolbyVision' : hasHdr10Plus ? 'hdr10plus' : format === 'pq' ? 'hdr10' : format === 'hlg' ? 'hlg' : 'sdr';
   const hdr = {
-    isHdr: Boolean(format),
+    isHdr: type !== 'sdr',
     format,
+    type,
+    hasDynamicMetadata: hasDolbyVision || hasHdr10Plus,
+    hasDolbyVision,
+    hasHdr10Plus,
+    dolbyVisionProfile,
     colorPrimaries,
     colorTransfer,
     colorSpace,
+    masteringDisplay: mediaInfoVideoTrack?.MasteringDisplay_ColorPrimaries || '',
+    masteringDisplayLuminance: mediaInfoVideoTrack?.MasteringDisplay_Luminance || '',
+    maxContentLightLevel: parseNumericMetadata(mediaInfoVideoTrack?.MaxCLL || mediaInfoVideoTrack?.MaximumContentLightLevel),
+    maxFrameAverageLightLevel: parseNumericMetadata(mediaInfoVideoTrack?.MaxFALL || mediaInfoVideoTrack?.MaximumFrameAverageLightLevel),
   };
 
   return hdr;

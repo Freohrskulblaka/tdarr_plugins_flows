@@ -8,9 +8,9 @@
 const PROFILE_STATUS = {enabled: 'enabled', disabled: 'disabled', invalid: 'invalid'};
 
 const VIDEO_PROFILES = {
-  Balanced: { status: PROFILE_STATUS.enabled, encoderPreset: 'slow', bitDepth: '10-Bit', fullHdCompressionRate: '0.101', fourKCompressionRate: '0.08', hdrPolicy: 'preserveSignaling' },
-  'Archive Quality': { status: PROFILE_STATUS.enabled, encoderPreset: 'slow', bitDepth: '10-Bit', fullHdCompressionRate: '0.12', fourKCompressionRate: '0.10', hdrPolicy: 'preserveSignaling' },
-  'Smaller Files': { status: PROFILE_STATUS.enabled, encoderPreset: 'medium', bitDepth: '10-Bit', fullHdCompressionRate: '0.08', fourKCompressionRate: '0.06', hdrPolicy: 'preserveSignaling' },
+  Balanced: { status: PROFILE_STATUS.enabled, encoderPreset: 'slow', bitDepth: '10-Bit', fullHdCompressionRate: '0.101', fourKCompressionRate: '0.08' },
+  'Archive Quality': { status: PROFILE_STATUS.enabled, encoderPreset: 'slow', bitDepth: '10-Bit', fullHdCompressionRate: '0.12', fourKCompressionRate: '0.10' },
+  'Smaller Files': { status: PROFILE_STATUS.enabled, encoderPreset: 'medium', bitDepth: '10-Bit', fullHdCompressionRate: '0.08', fourKCompressionRate: '0.06' },
 };
 
 const VIDEO_RESOLUTION_PROFILES = {
@@ -26,6 +26,11 @@ const VIDEO_CODEC_PROFILES = {
   'H.265 / HEVC - Intel GPU': { status: PROFILE_STATUS.enabled, targetCodec: 'hevc', encoder: 'hevc_qsv', encoderFamily: 'intel' },
   'H.265 / HEVC - AMD GPU': { status: PROFILE_STATUS.enabled, targetCodec: 'hevc', encoder: 'hevc_amf', encoderFamily: 'amd' },
   'Copy Video': { status: PROFILE_STATUS.enabled, targetCodec: 'copy', encoder: 'copy', encoderFamily: 'copy' },
+};
+
+const HDR_HANDLING_PROFILES = {
+  'Auto Preserve HDR': { status: PROFILE_STATUS.enabled, hdrPolicy: 'autoPreserve' },
+  'Copy HDR Video': { status: PROFILE_STATUS.enabled, hdrPolicy: 'copyHdr' },
 };
 
 const AUDIO_PROFILES = {
@@ -89,11 +94,12 @@ function resolveProfiles(inputs) {
   const codecProfile = resolveSelectedProfile(VIDEO_CODEC_PROFILES, inputs.videoCodec, 'videoCodec');
   const qualityProfile = resolveSelectedProfile(VIDEO_PROFILES, inputs.videoQualityProfile, 'videoQualityProfile');
   const resolutionProfile = resolveSelectedProfile(VIDEO_RESOLUTION_PROFILES, inputs.videoResolution, 'videoResolution');
+  const hdrProfile = resolveSelectedProfile(HDR_HANDLING_PROFILES, inputs.hdrHandling, 'hdrHandling');
   const audioProfile = resolveSelectedProfile(AUDIO_PROFILES, inputs.audioProfile, 'audioProfile');
   const subtitleProfile = resolveSelectedProfile(SUBTITLE_PROFILES, inputs.subtitleProfile, 'subtitleProfile');
   const metadataProfile = resolveSelectedProfile(METADATA_PROFILES, inputs.metadataProfile, 'metadataProfile');
-  const invalidVideoReasons = [...qualityProfile.invalidReasons, ...resolutionProfile.invalidReasons, ...codecProfile.invalidReasons];
-  const disabledVideoReasons = [...qualityProfile.disabledReasons, ...resolutionProfile.disabledReasons, ...codecProfile.disabledReasons];
+  const invalidVideoReasons = [...qualityProfile.invalidReasons, ...resolutionProfile.invalidReasons, ...codecProfile.invalidReasons, ...hdrProfile.invalidReasons];
+  const disabledVideoReasons = [...qualityProfile.disabledReasons, ...resolutionProfile.disabledReasons, ...codecProfile.disabledReasons, ...hdrProfile.disabledReasons];
   const resolvedStatus = disabledVideoReasons.length > 0 ? PROFILE_STATUS.disabled : PROFILE_STATUS.enabled;
   let videoProfile;
 
@@ -104,14 +110,14 @@ function resolveProfiles(inputs) {
       disabledReasons: [],
     };
   } else if (codecProfile.targetCodec === 'copy') {
-    videoProfile = Object.assign({}, qualityProfile, resolutionProfile, codecProfile, {
+    videoProfile = Object.assign({}, qualityProfile, resolutionProfile, codecProfile, hdrProfile, {
       status: resolvedStatus,
       disabledReasons: disabledVideoReasons,
       encoderPreset: 'copy',
       bitDepth: 'source',
     });
   } else {
-    videoProfile = Object.assign({}, qualityProfile, resolutionProfile, codecProfile, {
+    videoProfile = Object.assign({}, qualityProfile, resolutionProfile, codecProfile, hdrProfile, {
       status: resolvedStatus,
       invalidReasons: invalidVideoReasons,
       disabledReasons: disabledVideoReasons,

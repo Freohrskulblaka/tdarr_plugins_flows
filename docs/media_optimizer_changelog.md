@@ -4,6 +4,14 @@ History of `../classic_plugins/media_optimizer/tdarr_plugin_media_optimizer.js` 
 
 ---
 
+## 2026-09-15 - Freohrskulblaka
+
+### Added fail-safe dynamic HDR preservation
+
+Added explicit HDR handling profiles, richer HDR10, HLG, HDR10+, and Dolby Vision analysis, and a fail-safe video planning rule. Media Optimizer can transcode static HDR10 and HLG with source color signaling, but copies HDR10+ and Dolby Vision video so it never silently drops dynamic metadata.
+
+Documented pinned `dovi_tool` and `hdr10plus_tool` releases and node paths for a separate future dynamic-HDR workflow in `hdr_tooling.md`.
+
 ## 2026-08-05 - Freohrskulblaka
 
 ### Escaped tooltip line breaks for Tdarr rendering

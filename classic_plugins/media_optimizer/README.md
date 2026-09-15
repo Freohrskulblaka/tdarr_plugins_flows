@@ -5,7 +5,7 @@ Deployable Tdarr classic plugin package for Media Optimizer.
 ## Contents
 
 - `tdarr_plugin_media_optimizer.js`: classic plugin entrypoint loaded by Tdarr.
-- `media_optimizer/`: support modules grouped by runtime concerns, pipeline orchestration, media domains, integrations, and shared helpers.
+- `media_optimizer/`: support modules grouped by runtime concerns, pipeline orchestration, media domains, integrations, and utilities.
 
 Keep these two items together. The plugin uses relative `require(...)` calls into the sibling `media_optimizer/` folder.
 
@@ -25,19 +25,21 @@ media_optimizer/
       audio/
       chapters/
       file/
-      media_info/
+      media/
       metadata/
       subtitles/
       video/
     integrations/
     pipeline/
     runtime/
-    shared/
+    utils/
 ```
 
 5. Restart the Tdarr node or refresh local plugins.
 6. Add `Media Optimizer` to the target library flow in Tdarr.
 7. Start with `dryRun=true` and `logLevel=debug` for the first validation pass.
 8. Confirm the Tdarr log shows the expected runtime marker and planned track table before allowing live processing.
+
+Media Optimizer safely copies HDR10+ and Dolby Vision video because restoring their dynamic metadata requires a separate process. See [`../../docs/hdr_tooling.md`](../../docs/hdr_tooling.md) for the installed tool versions and the boundary for that future workflow.
 
 Do not commit real hosts, API keys, runtime exports, logs, or media samples.

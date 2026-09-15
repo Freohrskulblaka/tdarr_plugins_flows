@@ -146,6 +146,20 @@ function applyVideoTrackDecision(track, context, isPrimaryVideo) {
     });
   }
 
+  if (track.hdr.isHdr && settings.hdrPolicy === 'copyHdr') {
+    return Object.assign({}, track, {
+      action: 'copy',
+      reasons: ['HDR handling is configured to copy HDR video without re-encoding it.'],
+    });
+  }
+
+  if (track.hdr.hasDynamicMetadata) {
+    return Object.assign({}, track, {
+      action: 'copy',
+      reasons: [`${track.hdr.type === 'dolbyVision' ? 'Dolby Vision' : 'HDR10+'} dynamic metadata requires a separate restoration workflow; the video will be copied so that metadata is not lost.`],
+    });
+  }
+
   const trackDecision = applyVideoCompatibilityDecision(track, context);
 
   return trackDecision;
@@ -215,8 +229,11 @@ function applyVideoCompatibilityDecision(track, context) {
   if (action === 'transcode') {
     const encoderArgs = createVideoEncoderArgs({ track, settings, bitrate });
 
-    if (track.hdr.isHdr && settings.hdrPolicy === 'preserveSignaling') {
-      reasons.push(`${track.hdr.format.toUpperCase()} HDR was detected; source color signaling will be written during transcode.`);
+    if (track.hdr.isHdr && settings.hdrPolicy === 'autoPreserve') {
+      const hdrLabel = track.hdr.type === 'dolbyVision'
+        ? `Dolby Vision Profile ${track.hdr.dolbyVisionProfile || 'unknown'}`
+        : track.hdr.type.toUpperCase();
+      reasons.push(`${hdrLabel} was detected; source color signaling will be written during transcode.`);
     }
 
     ffmpeg.codec = settings.encoder;
@@ -264,7 +281,7 @@ function createVideoEncoderArgs({ track, settings, bitrate }) {
     colorSpace: '-colorspace',
   };
 
-  if (settings.hdrPolicy === 'preserveSignaling') {
+  if (settings.hdrPolicy === 'autoPreserve') {
     Object.entries(colorArgs).forEach(([property, option]) => {
       const value = track.hdr[property];
 
@@ -272,6 +289,10 @@ function createVideoEncoderArgs({ track, settings, bitrate }) {
         args.push(option, value);
       }
     });
+
+    if (settings.encoderFamily === 'nvidia') {
+      args.push('-extra_sei', '1');
+    }
   }
 
   return args;

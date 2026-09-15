@@ -95,6 +95,24 @@ function details() {
         `,
       },
       {
+        name: 'hdrHandling',
+        type: 'string',
+        defaultValue: 'Auto Preserve HDR',
+        inputUI: {
+          type: 'dropdown',
+          options: [
+            'Auto Preserve HDR',
+            'Copy HDR Video',
+          ],
+        },
+        tooltip: `
+          Select how HDR video is handled when video transcoding would otherwise be needed.\\n
+          Auto Preserve HDR: transcodes HDR10 and HLG with their source color signaling. HDR10+ and Dolby Vision video is copied so dynamic metadata is not silently lost.\\n
+          Copy HDR Video: always copies HDR video without re-encoding it. Audio, subtitle, chapter, attachment, and metadata changes may still be applied in a lossless remux.\\n
+          Dynamic HDR extraction and restoration belongs to a separate future processing workflow and is not performed by Media Optimizer.
+        `,
+      },
+      {
         name: 'audioProfile',
         type: 'string',
         defaultValue: 'Compatibility 5.1 + Stereo',

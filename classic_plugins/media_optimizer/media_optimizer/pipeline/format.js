@@ -194,7 +194,8 @@ function renderVideo(lines, videoPlan) {
   lines.push('Video:');
 
   videoPlan.tracks.forEach((track) => {
-    const hdr = track.hdr?.isHdr ? ' hdr=yes' : '';
+    const hdrProfile = track.hdr?.dolbyVisionProfile ? ` profile=${track.hdr.dolbyVisionProfile}` : '';
+    const hdr = track.hdr?.isHdr ? ` hdr=${track.hdr.type || track.hdr.format || 'yes'}${hdrProfile}` : '';
     const bitrate = track.bitrate ? ` bitrate=${track.bitrate.current.kbps}k target=${track.bitrate.selected.targetKbps}k` : '';
     lines.push(`  ${track.outputIndex} src=${track.sourceIndex} ${track.language} ${track.codec}->${track.targetCodec} ${track.width}x${track.height} ${track.resolution?.label || ''}${hdr}${bitrate} action=${track.action} default=${track.default ? 'yes' : 'no'}`);
   });
