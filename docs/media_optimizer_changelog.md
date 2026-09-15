@@ -6,6 +6,14 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ## 2026-09-15 - Freohrskulblaka
 
+### Secured Arr connection configuration
+
+Added preferred Arr connection resolution from complete library-variable pairs, global-variable pairs, or worker environment-variable pairs without mixing credentials between sources. The existing connection-profile input remains available as the final fallback for installations where Tdarr does not pass either preferred source to the classic plugin.
+
+Added defensive log redaction for API keys, authorization values, passwords, secrets, and tokens. Debug output reports only whether each Arr service is configured and which configuration source was selected. Documentation warns that Tdarr may expose the fallback plugin input in its own job logs. The plugin version is now `0.1.1`.
+
+Runtime marker: `media-optimizer-secure-arr-variables-2026-09-15-42`.
+
 ### Packaged for public deployment
 
 Reorganized the package to mirror Tdarr's proven `Plugins/Local` entrypoint and sibling `Plugins/media_optimizer` support layout. The deployed filename now matches the plugin ID, and support dependencies load from inside the plugin execution path.

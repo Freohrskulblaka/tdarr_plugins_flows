@@ -66,7 +66,9 @@ function formatLogEntry(entry) {
   let formattedData = '';
 
   try {
-    formattedData = JSON.stringify(entry.data);
+    formattedData = JSON.stringify(entry.data, (key, value) => (
+      /api.?key|authorization|password|secret|token/i.test(key) ? '[REDACTED]' : value
+    ));
   } catch (error) {
     formattedData = `[Unable to format log data: ${error.message}]`;
   }

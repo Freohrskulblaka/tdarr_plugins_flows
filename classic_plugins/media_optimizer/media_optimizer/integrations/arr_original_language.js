@@ -2,7 +2,7 @@
  * Media Optimizer Original Language Integration
  * Created by: Freohrskulblaka
  * Created on: 2026-06-29
- * Description: Resolves original language from normalized audio analysis or an optional Sonarr/Radarr connection profile.
+ * Description: Resolves original language from normalized audio analysis or optional Sonarr/Radarr variables.
  */
 
 const { normalizeLanguageForVariant, normalizeVariantText } = require('../utils/language');
@@ -12,15 +12,15 @@ const REQUEST_TIMEOUT_MS = 10000;
 
 async function resolveOriginalLanguage(context) {
   const lookupMode = context.settings.originalLanguageLookup || 'Filename and Streams Only';
-  const connectionProfile = context.lookup?.arrConnectionProfile || {};
+  const arrConnections = context.lookup?.arrConnections || {};
   const analyzedAudioLanguage = context.analysis.streams.audio.items
     .map((stream) => stream.analysis?.audio?.language)
     .find((language) => language && language !== 'und');
   const configuredLanguage = normalizeLanguageForVariant(context.settings.languageOrder.audio[0] || 'und');
   const localLanguage = analyzedAudioLanguage || configuredLanguage || 'und';
   const localSource = analyzedAudioLanguage ? 'audioStream' : 'languageOrderFallback';
-  const radarrConfigured = Boolean(connectionProfile.radarr?.host && connectionProfile.radarr?.apiKey);
-  const sonarrConfigured = Boolean(connectionProfile.sonarr?.host && connectionProfile.sonarr?.apiKey);
+  const radarrConfigured = Boolean(arrConnections.radarr?.host && arrConnections.radarr?.apiKey);
+  const sonarrConfigured = Boolean(arrConnections.sonarr?.host && arrConnections.sonarr?.apiKey);
   const originalLanguage = {
     language: localLanguage,
     languageName: '',
@@ -44,7 +44,7 @@ async function resolveOriginalLanguage(context) {
     return originalLanguage;
   }
 
-  const request = createArrLookupRequest(context, connectionProfile, originalLanguage.errors);
+  const request = createArrLookupRequest(context, arrConnections, originalLanguage.errors);
 
   if (!request) {
     originalLanguage.note = 'API lookup did not resolve an original language. Using local stream fallback.';
@@ -103,7 +103,7 @@ async function resolveOriginalLanguage(context) {
   return originalLanguage;
 }
 
-function createArrLookupRequest(context, connectionProfile, errors) {
+function createArrLookupRequest(context, arrConnections, errors) {
   const media = context.analysis.media;
 
   if (media.type === 'TV Show') {
@@ -112,21 +112,21 @@ function createArrLookupRequest(context, connectionProfile, errors) {
       return null;
     }
 
-    if (!connectionProfile.sonarr?.host || !connectionProfile.sonarr?.apiKey) {
+    if (!arrConnections.sonarr?.host || !arrConnections.sonarr?.apiKey) {
       errors.push('Sonarr host or API key is missing; series lookup skipped.');
       return null;
     }
 
     return {
       source: 'sonarr',
-      connection: connectionProfile.sonarr,
+      connection: arrConnections.sonarr,
       pathname: '/api/v3/series',
       query: {tvdbId: media.tvdbId, includeSeasonImages: 'false'},
       movieIdentity: null,
     };
   }
 
-  if (!connectionProfile.radarr?.host || !connectionProfile.radarr?.apiKey) {
+  if (!arrConnections.radarr?.host || !arrConnections.radarr?.apiKey) {
     const prefix = media.type === 'Movie' ? '' : 'Media type is unknown and ';
     errors.push(`${prefix}Radarr host or API key is missing; lookup skipped.`);
     return null;
@@ -135,7 +135,7 @@ function createArrLookupRequest(context, connectionProfile, errors) {
   if (media.imdbId) {
     return {
       source: 'radarr',
-      connection: connectionProfile.radarr,
+      connection: arrConnections.radarr,
       pathname: '/api/v3/movie/lookup/imdb',
       query: {imdbId: media.imdbId},
       movieIdentity: null,
@@ -151,7 +151,7 @@ function createArrLookupRequest(context, connectionProfile, errors) {
 
   return {
     source: 'radarr',
-    connection: connectionProfile.radarr,
+    connection: arrConnections.radarr,
     pathname: '/api/v3/movie/lookup',
     query: {term: movieIdentity.term},
     movieIdentity,

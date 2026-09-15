@@ -46,7 +46,33 @@ Do not replace or copy the `methods/` folder. Tdarr supplies it.
 6. Restart the Tdarr node or refresh local plugins.
 7. Add `Media Optimizer` to the target classic plugin stack, or select it through Tdarr's Run Classic Plugin flow component.
 8. Start with `dryRun=true` and `logLevel=debug` for the first validation pass.
-9. Confirm the Tdarr log shows `media-optimizer-release-package-2026-09-15-41` and the expected planned track table before allowing live processing.
+9. Confirm the Tdarr log shows `media-optimizer-secure-arr-variables-2026-09-15-42` and the expected planned track table before allowing live processing.
+
+## Configure Sonarr And Radarr
+
+Select `Sonarr/Radarr Arr Profile`. Media Optimizer first checks Tdarr variables and worker environment variables so credentials do not need to be stored in plugin inputs.
+
+When the classic plugin receives Tdarr variables, each complete library pair overrides the global pair:
+
+| Tdarr variable | Purpose |
+| --- | --- |
+| `MediaOptimizerSonarrHost` | Sonarr URL, with an optional reverse-proxy base path |
+| `MediaOptimizerSonarrAPIKey` | Sonarr API key |
+| `MediaOptimizerRadarrHost` | Radarr URL, with an optional reverse-proxy base path |
+| `MediaOptimizerRadarrAPIKey` | Radarr API key |
+
+The current Tdarr Run Classic Plugin flow component does not forward `userVariables` to the classic plugin. For that execution path, define these environment variables on every Tdarr Node that may run Media Optimizer:
+
+| Worker environment variable | Purpose |
+| --- | --- |
+| `MEDIA_OPTIMIZER_SONARR_HOST` | Sonarr URL |
+| `MEDIA_OPTIMIZER_SONARR_API_KEY` | Sonarr API key |
+| `MEDIA_OPTIMIZER_RADARR_HOST` | Radarr URL |
+| `MEDIA_OPTIMIZER_RADARR_API_KEY` | Radarr API key |
+
+Restart the affected Tdarr Nodes after changing their environment. The source order for each service is library variables, global variables, worker environment variables, then the `arrConnectionProfile` plugin input.
+
+The existing `arrConnectionProfile` JSON input remains available as a fallback for installations where neither Tdarr variables nor worker environment variables reach the classic plugin. Tdarr may include plugin input values in job logs, so the fallback should be used only when necessary. API keys are sent only through the `X-Api-Key` request header. Debug logging reports whether each service is configured and which source was selected, but never its host, API key, or fallback profile.
 
 ## Build A Release Archive
 
@@ -68,4 +94,4 @@ To roll back, stop or pause Tdarr again, remove the failed entrypoint and suppor
 
 Media Optimizer safely copies HDR10+ and Dolby Vision video because restoring their dynamic metadata requires a separate process. See [`../../docs/hdr_tooling.md`](../../docs/hdr_tooling.md) for the installed tool versions and the boundary for that future workflow.
 
-Do not commit real hosts, API keys, runtime exports, logs, or media samples.
+Prefer variables over the plugin-input fallback. Do not commit real hosts, API keys, runtime exports, logs, or media samples.

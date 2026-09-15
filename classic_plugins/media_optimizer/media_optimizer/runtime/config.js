@@ -8,7 +8,7 @@
 const { createLog } = require('./logging');
 const { createProfileConfig } = require('./profiles');
 const { loadTdarrMethodsLib } = require('./tdarr_methods');
-const { parseArrConnectionProfile } = require('../integrations/arr_connection_profile');
+const { resolveArrConnections } = require('../integrations/arr_connections');
 const { normalizeLanguageForVariant } = require('../utils/language');
 
 const BOOLEAN_INPUTS = ['dryRun', 'keepAudioCommentary', 'keepDescriptiveAudio'];
@@ -39,7 +39,7 @@ function loadInputs(inputs, details) {
   };
 }
 
-function prepareConfig(inputs) {
+function prepareConfig(inputs, otherArguments = {}, environment = process.env) {
   const profileConfig = createProfileConfig(inputs);
   const validationErrors = [...profileConfig.messages.validationErrors];
   const parseChoice = (value, allowedValues, inputName, fallback) => {
@@ -108,10 +108,10 @@ function prepareConfig(inputs) {
   const keepDescriptive = parseBoolean(inputs.keepDescriptiveAudio, 'keepDescriptiveAudio', true);
   const audioLanguageOrder = parseLanguageList(inputs.audioLanguages, 'audioLanguages');
   const subtitleLanguageOrder = parseLanguageList(inputs.subtitleLanguages, 'subtitleLanguages');
-  const arrConnectionProfile = parseArrConnectionProfile(inputs.arrConnectionProfile);
+  const arrConnections = resolveArrConnections(otherArguments, environment, inputs.arrConnectionProfile);
 
-  if (originalLanguageLookup === 'Sonarr/Radarr Arr Profile' && arrConnectionProfile.isInvalid) {
-    validationErrors.push(arrConnectionProfile.validationError);
+  if (originalLanguageLookup === 'Sonarr/Radarr Arr Profile' && arrConnections.isInvalid) {
+    validationErrors.push(arrConnections.validationError);
   }
 
   const config = {
@@ -141,7 +141,7 @@ function prepareConfig(inputs) {
       metadata: profileConfig.settings.metadata,
     },
     lookup: {
-      arrConnectionProfile,
+      arrConnections,
     },
   };
 

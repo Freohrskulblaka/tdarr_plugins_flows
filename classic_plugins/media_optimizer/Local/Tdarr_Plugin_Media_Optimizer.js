@@ -6,7 +6,7 @@
  * Changelog: ../../../docs/media_optimizer_changelog.md
  */
 
-const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-release-package-2026-09-15-41';
+const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-secure-arr-variables-2026-09-15-42';
 
 function loadOptimizerModules() {
   const path = require('path');
@@ -39,8 +39,8 @@ function details() {
     Stage: 'Pre-processing',
     Type: 'Video, Audio, Subtitle',
     Operation: 'Transcode',
-    Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, normalized compatibility tracks, commentary and descriptive-audio handling, subtitle retention and external subtitle import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through the Arr connection profile input. Already-compliant files return no-process with a compact summary instead of reprocessing.',
-    Version: '0.1.0',
+    Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, normalized compatibility tracks, commentary and descriptive-audio handling, subtitle retention and external subtitle import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through Tdarr variables, worker environment variables, or a fallback connection profile. Already-compliant files return no-process with a compact summary instead of reprocessing.',
+    Version: '0.1.1',
     Tags: 'pre-processing, ffmpeg, media optimizer, configurable',
     Inputs: [
       {
@@ -257,28 +257,27 @@ function details() {
           Select how original language should be resolved.\\n
           Disabled: skips Sonarr/Radarr and disables original-language lookup logic. Local stream language may still be used as a fallback label.\\n
           Filename and Streams Only: avoids Sonarr/Radarr and uses filename IDs plus local stream metadata where possible.\\n
-          Sonarr/Radarr Arr Profile: uses the arrConnectionProfile JSON input to ask Sonarr/Radarr for original language metadata.\\n
+          Sonarr/Radarr Arr Profile: uses Tdarr library variables, global variables, worker environment variables, or the fallback connection profile to ask Sonarr/Radarr for original language metadata.\\n
           Radarr is used for movie-style matches; Sonarr is used for TV-style matches.\\n
-          Tdarr may log plugin input values; keep Arr instances local or rotate keys after rollout.\\n
-          Example: use Sonarr/Radarr Arr Profile for normal production, Filename and Streams Only for offline testing.
+          API keys are sent through the X-Api-Key request header and are never included in the request URL.\\n
+          Example: use Sonarr/Radarr Arr Profile for normal production, Filename and Streams Only for offline testing.\\n
+          Connection variable names and worker environment setup are documented in the package README.
         `,
       },
       {
         name: 'arrConnectionProfile',
         type: 'string',
         defaultValue: '',
-        inputUI: { type: 'text' },
+        inputUI: {type: 'text'},
         tooltip: `
-          Optional JSON object for Sonarr/Radarr original-language lookup.\\n
-          Include only the services you use.\\n
+          Optional fallback JSON object for Sonarr/Radarr original-language lookup.\\n
+          Tdarr library variables, global variables, and worker environment variables take priority over this input.\\n
+          Include only the services that do not have a preferred variable source.\\n
           Hosts can include or omit http:// and may include a reverse-proxy URL base path.\\n
           API keys are sent through the X-Api-Key request header instead of the request URL.\\n
-          Do not deploy local .env harness files; this input is the Tdarr-side connection profile.\\n
-          The expected keys are sonarr.host, sonarr.apiKey, radarr.host, and radarr.apiKey.\\n
+          Tdarr may include plugin input values in job logs, so use this only when the preferred variable sources are unavailable.\\n
           Example with both services:\\n
-          {"sonarr":{"host":"10.0.0.10:8989","apiKey":"key"},"radarr":{"host":"10.0.0.10:7878","apiKey":"key"}}\\n
-          Example with Radarr only:\\n
-          {"radarr":{"host":"10.0.0.10:7878","apiKey":"key"}}
+          {"sonarr":{"host":"10.0.0.10:8989","apiKey":"key"},"radarr":{"host":"10.0.0.10:7878","apiKey":"key"}}
         `,
       },
       {
@@ -337,13 +336,19 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
     summarizeAnalysis,
   } = loadOptimizerModules();
   const rawInputs = loadInputs(inputs, details);
-  const config = prepareConfig(rawInputs);
+  const config = prepareConfig(rawInputs, otherArguments);
   const context = createContext(file, librarySettings, config, otherArguments);
   const runMode = context.settings.dryRun ? 'Dry Run' : 'Process';
 
   context.log.section(`Media Optimizer ${runMode}`);
   context.log.info('Runtime marker', MEDIA_OPTIMIZER_RUNTIME_MARKER);
   context.log.info('Resolved settings', context.settings);
+  context.log.debug('Arr lookup configuration', Object.fromEntries(
+    ['sonarr', 'radarr'].map((appName) => [appName, {
+      configured: Boolean(context.lookup.arrConnections[appName].host && context.lookup.arrConnections[appName].apiKey),
+      source: context.lookup.arrConnections[appName].source,
+    }]),
+  ));
   if (config.isInvalid) {
     context.log.error('Configuration is invalid', config.messages.validationErrors);
     return createResponse(context);
