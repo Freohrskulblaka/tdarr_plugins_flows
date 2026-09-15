@@ -5,6 +5,8 @@
  * Description: Builds video processing decisions from normalized analysis and video profile settings.
  */
 
+const H264_TO_HEVC_BITRATE_FACTOR = 0.65;
+
 function planVideo(context) {
   const videoStreams = context.analysis.streams.video.items;
   const tracks = [];
@@ -175,14 +177,27 @@ function applyVideoCompatibilityDecision(track, context) {
   const bitrate = Object.assign({}, track.bitrate);
   const reasons = [];
   let action = track.action;
-  const codecMatches = normalizeVideoCodec(track.codec) === normalizeVideoCodec(settings.targetCodec);
+  const sourceCodec = normalizeVideoCodec(track.codec);
+  const targetCodec = normalizeVideoCodec(settings.targetCodec);
+  const codecMatches = sourceCodec === targetCodec;
   const shouldUpscale = settings.upscaleTo1080p && track.resolution.isLowRes;
   const shouldDownscale4k = settings.downscale4k && track.resolution.is4k;
   const selectedBitrate = shouldUpscale || shouldDownscale4k ? bitrate.fullHd : bitrate.native;
 
   bitrate.selected = Object.assign({}, selectedBitrate);
 
-  if (!codecMatches && bitrate.current.kbps > 0 && bitrate.selected.targetKbps > bitrate.current.kbps) {
+  if (sourceCodec === 'h264' && targetCodec === 'hevc' && !shouldUpscale && bitrate.current.kbps > 0) {
+    const baselineKbps = Math.min(bitrate.selected.targetKbps, bitrate.current.kbps);
+    const targetKbps = roundToNearestHundred(baselineKbps * H264_TO_HEVC_BITRATE_FACTOR);
+
+    bitrate.selected = Object.assign({}, bitrate.selected, {
+      targetKbps,
+      maxKbps: roundToNearestHundred(targetKbps * 1.25),
+      isHevcEfficiencyAdjusted: true,
+      efficiencyBaselineKbps: baselineKbps,
+      efficiencyFactor: H264_TO_HEVC_BITRATE_FACTOR,
+    });
+  } else if (!codecMatches && !shouldUpscale && bitrate.current.kbps > 0 && bitrate.selected.targetKbps > bitrate.current.kbps) {
     const cappedTargetKbps = roundToNearestHundred(bitrate.current.kbps);
     bitrate.selected = Object.assign({}, bitrate.selected, {
       targetKbps: cappedTargetKbps,
@@ -224,6 +239,10 @@ function applyVideoCompatibilityDecision(track, context) {
 
   if (bitrate.selected.isSourceCapped) {
     reasons.push(`Video target was capped at the source video bitrate of ${bitrate.selected.targetKbps}k to prevent file growth.`);
+  }
+
+  if (bitrate.selected.isHevcEfficiencyAdjusted) {
+    reasons.push(`H.264-to-HEVC target was set to ${bitrate.selected.targetKbps}k, or 65% of the lower ${bitrate.selected.efficiencyBaselineKbps}k profile/source bitrate baseline.`);
   }
 
   if (action === 'transcode') {

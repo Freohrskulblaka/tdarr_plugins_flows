@@ -6,6 +6,14 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ## 2026-09-15 - Freohrskulblaka
 
+### Applied HEVC bitrate efficiency during H.264 conversion
+
+Changed same-resolution H.264-to-HEVC planning to use 65% of the lower source or profile bitrate baseline. High-bitrate sources therefore use 65% of the selected resolution profile, while already-compressed sources use 65% of their current video bitrate instead of being transcoded at effectively the same bitrate.
+
+True below-1080p upscales retain the full 1080p profile target so a low-resolution source bitrate does not starve the enlarged output. The plugin version is now `0.1.3`.
+
+Runtime marker: `media-optimizer-hevc-bitrate-efficiency-2026-09-15-44`.
+
 ### Compacted normal processing logs
 
 Changed normal logging to report high-level retained, generated, and removed track counts without printing a line and repeated reason for every removed track. Full analysis, per-track decisions, reasons, and command previews remain available in debug mode; normal dry runs continue to include the command preview.
