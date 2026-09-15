@@ -6,6 +6,14 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ## 2026-09-15 - Freohrskulblaka
 
+### Compacted normal processing logs
+
+Changed normal logging to report high-level retained, generated, and removed track counts without printing a line and repeated reason for every removed track. Full analysis, per-track decisions, reasons, and command previews remain available in debug mode; normal dry runs continue to include the command preview.
+
+The plugin version is now `0.1.2`.
+
+Runtime marker: `media-optimizer-compact-normal-logs-2026-09-15-43`.
+
 ### Secured Arr connection configuration
 
 Added preferred Arr connection resolution from complete library-variable pairs, global-variable pairs, or worker environment-variable pairs without mixing credentials between sources. The existing connection-profile input remains available as the final fallback for installations where Tdarr does not pass either preferred source to the classic plugin.

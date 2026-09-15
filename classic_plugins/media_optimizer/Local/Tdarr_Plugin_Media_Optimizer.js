@@ -6,7 +6,7 @@
  * Changelog: ../../../docs/media_optimizer_changelog.md
  */
 
-const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-secure-arr-variables-2026-09-15-42';
+const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-compact-normal-logs-2026-09-15-43';
 
 function loadOptimizerModules() {
   const path = require('path');
@@ -40,7 +40,7 @@ function details() {
     Type: 'Video, Audio, Subtitle',
     Operation: 'Transcode',
     Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, normalized compatibility tracks, commentary and descriptive-audio handling, subtitle retention and external subtitle import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through Tdarr variables, worker environment variables, or a fallback connection profile. Already-compliant files return no-process with a compact summary instead of reprocessing.',
-    Version: '0.1.1',
+    Version: '0.1.2',
     Tags: 'pre-processing, ffmpeg, media optimizer, configurable',
     Inputs: [
       {
@@ -307,8 +307,8 @@ function details() {
         tooltip: `
           Controls Media Optimizer log verbosity.\\n
           summary: compact compliance summary only. Best for stable no-process reruns.\\n
-          normal: standard rollout logging. Shows useful plan details without the full debug analysis on no-op runs.\\n
-          debug: full analysis, planning reasons, final track table, and command preview. Best for diagnosing why a file would or would not process.\\n
+          normal: standard rollout logging. Shows compact processing counts and outcomes without listing every retained or removed track. Dry runs also include the command preview.\\n
+          debug: full analysis, per-track planning reasons, final track table, and command preview. Best for diagnosing why a file would or would not process.\\n
           In dry run, normal and debug intentionally include the planned FFmpeg command preview.\\n
           Example: use summary for broad rollout monitoring and debug for a single confusing file.
         `,
@@ -372,23 +372,27 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
 
   runInPlaceActions(context);
 
-  if (context.settings.logLevel === 'summary') {
-    context.log.section('Compliance summary');
-    context.log.summary(renderPlanSummary(context.plan, context.analysis));
-  } else if (context.plan.shouldProcess || context.settings.dryRun) {
+  if (context.settings.logLevel === 'debug') {
     context.log.info('Analysis summary', summarizeAnalysis(context.analysis, context.settings));
     context.log.section('Planned final track table');
     context.log.info(renderFinalTrackTable(context.plan));
     context.log.section('Planned FFmpeg command');
     context.log.info(renderFfmpegCommandPreview(context.plan.command));
   } else {
-    const isDebugNoOp = context.settings.logLevel === 'debug';
+    const summaryTitle = context.plan.shouldProcess ? 'Processing summary' : 'Compliance summary';
+    const summary = renderPlanSummary(context.plan, context.analysis);
 
-    if (isDebugNoOp) {
-      context.log.info('Analysis summary', summarizeAnalysis(context.analysis, context.settings));
+    context.log.section(summaryTitle);
+    if (context.settings.logLevel === 'summary') {
+      context.log.summary(summary);
+    } else {
+      context.log.info(summary);
     }
-    context.log.section('Compliance summary');
-    context.log.info(renderPlanSummary(context.plan, context.analysis, { includeReasons: isDebugNoOp }));
+
+    if (context.settings.dryRun && context.settings.logLevel === 'normal') {
+      context.log.section('Planned FFmpeg command');
+      context.log.info(renderFfmpegCommandPreview(context.plan.command));
+    }
   }
 
   return createResponse(context);
