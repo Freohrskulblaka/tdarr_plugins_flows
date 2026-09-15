@@ -69,6 +69,8 @@ runtime_settings*
 current_runtime_settings*
 private/
 local/
+!classic_plugins/media_optimizer/Local/
+!classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimizer.js
 
 # Dependency/build output
 node_modules/

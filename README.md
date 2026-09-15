@@ -4,7 +4,7 @@ Tdarr classic plugins and support modules maintained by Freohrskulblaka.
 
 ## Plugins
 
-- `classic_plugins/media_optimizer/`: deployable Media Optimizer classic plugin package. It contains the Tdarr entrypoint, support modules, and deployment README.
+- `classic_plugins/media_optimizer/`: deployable Media Optimizer classic plugin package. Its `Local/` and `media_optimizer/` folders mirror the final Tdarr `Plugins/` layout.
 - `classic_plugins/media_parts_extractor/`: deployable Media Parts Extractor classic plugin package. It contains the Tdarr entrypoint, support modules, and deployment README.
 
 ## Support Modules
@@ -17,17 +17,17 @@ Tdarr classic plugins and support modules maintained by Freohrskulblaka.
 
 This repository does not commit Tdarr runtime helpers, real Arr credentials, exports, media samples, or local test output.
 
-Deployment payloads should include only the relevant classic plugin package and required support module folders.
+Deployment payloads should include only the plugin's `Local/` entrypoint and required support module folder.
 
 Use `.env.example` as the placeholder shape for local lookup settings. Do not commit real hosts or API keys.
 
 ## Deployment Notes
 
-Deploy Media Optimizer from:
+Build or deploy Media Optimizer from:
 
 - `classic_plugins/media_optimizer/`
 
-See `classic_plugins/media_optimizer/README.md` for copy instructions and expected Tdarr layout.
+See `classic_plugins/media_optimizer/README.md` for release archive, backup, installation, validation, and rollback instructions.
 
 Deploy Media Parts Extractor with:
 

@@ -3,23 +3,33 @@
  * Created by: Freohrskulblaka
  * Created on: 2026-06-29
  * Description: Tdarr classic plugin entrypoint that orchestrates media optimizer configuration, analysis, planning, and response logging.
- * Changelog: ../../docs/media_optimizer_changelog.md
+ * Changelog: ../../../docs/media_optimizer_changelog.md
  */
 
-const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-utils-2026-09-15-40';
-const { loadInputs, prepareConfig, createContext } = require('./media_optimizer/runtime/config');
-const { createResponse } = require('./media_optimizer/runtime/response');
-const { runInPlaceActions } = require('./media_optimizer/pipeline/actions');
-const { resolveOriginalLanguage } = require('./media_optimizer/integrations/arr_original_language');
-const { analyzeFile } = require('./media_optimizer/pipeline/analyze');
-const { buildProcessingPlan } = require('./media_optimizer/pipeline/plan');
-const { buildFfmpegCommand } = require('./media_optimizer/pipeline/command');
-const {
-  renderFfmpegCommandPreview,
-  renderFinalTrackTable,
-  renderPlanSummary,
-  summarizeAnalysis,
-} = require('./media_optimizer/pipeline/format');
+const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-release-package-2026-09-15-41';
+
+function loadOptimizerModules() {
+  const path = require('path');
+  const supportRoot = path.resolve(__dirname, '..', 'media_optimizer');
+  const supportPrefix = `${supportRoot}${path.sep}`;
+
+  Object.keys(require.cache).forEach((cachedPath) => {
+    if (cachedPath.startsWith(supportPrefix)) {
+      delete require.cache[cachedPath];
+    }
+  });
+
+  return {
+    ...require(path.join(supportRoot, 'runtime/config')),
+    ...require(path.join(supportRoot, 'runtime/response')),
+    ...require(path.join(supportRoot, 'pipeline/actions')),
+    ...require(path.join(supportRoot, 'integrations/arr_original_language')),
+    ...require(path.join(supportRoot, 'pipeline/analyze')),
+    ...require(path.join(supportRoot, 'pipeline/plan')),
+    ...require(path.join(supportRoot, 'pipeline/command')),
+    ...require(path.join(supportRoot, 'pipeline/format')),
+  };
+}
 
 // #region Plugin Metadata
 function details() {
@@ -311,6 +321,21 @@ function details() {
 
 // #region Plugin Entry Point
 async function plugin(file, librarySettings, inputs, otherArguments) {
+  const {
+    analyzeFile,
+    buildFfmpegCommand,
+    buildProcessingPlan,
+    createContext,
+    createResponse,
+    loadInputs,
+    prepareConfig,
+    renderFfmpegCommandPreview,
+    renderFinalTrackTable,
+    renderPlanSummary,
+    resolveOriginalLanguage,
+    runInPlaceActions,
+    summarizeAnalysis,
+  } = loadOptimizerModules();
   const rawInputs = loadInputs(inputs, details);
   const config = prepareConfig(rawInputs);
   const context = createContext(file, librarySettings, config, otherArguments);

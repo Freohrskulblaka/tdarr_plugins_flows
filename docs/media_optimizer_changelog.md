@@ -1,10 +1,18 @@
 # Media Optimizer Changelog
 
-History of `../classic_plugins/media_optimizer/tdarr_plugin_media_optimizer.js` and the supporting `../classic_plugins/media_optimizer/media_optimizer/` libraries used by the classic Tdarr Media Optimizer plugin.
+History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimizer.js` and the supporting `../classic_plugins/media_optimizer/media_optimizer/` libraries used by the classic Tdarr Media Optimizer plugin.
 
 ---
 
 ## 2026-09-15 - Freohrskulblaka
+
+### Packaged for public deployment
+
+Reorganized the package to mirror Tdarr's proven `Plugins/Local` entrypoint and sibling `Plugins/media_optimizer` support layout. The deployed filename now matches the plugin ID, and support dependencies load from inside the plugin execution path.
+
+Added a release archive builder plus explicit installation, upgrade, backup, validation, and rollback instructions. Tdarr's existing `Plugins/methods` folder remains outside the release payload.
+
+Runtime marker: `media-optimizer-release-package-2026-09-15-41`.
 
 ### Consolidated shared utility behavior
 
