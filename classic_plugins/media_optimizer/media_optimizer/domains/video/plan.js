@@ -218,18 +218,17 @@ function applyVideoCompatibilityDecision(track, context) {
     reasons.push(`Video codec ${track.codec} does not match target ${settings.targetCodec}.`);
   }
 
+  // scale preserves display aspect ratio through SAR without a comma-separated filter chain.
   if (shouldUpscale) {
     action = 'transcode';
     reasons.push('Video is below 1080p and upscale-to-1080p is enabled.');
     ffmpeg.filters.push('scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos');
-    ffmpeg.filters.push('setsar=1');
   }
 
   if (shouldDownscale4k) {
     action = 'transcode';
     reasons.push('Video is 4K and the selected resolution policy limits output to 1080p.');
     ffmpeg.filters.push('scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos');
-    ffmpeg.filters.push('setsar=1');
   }
 
   if (shouldTranscodeForBitrate) {

@@ -46,7 +46,9 @@ Do not replace or copy the `methods/` folder. Tdarr supplies it.
 6. Restart the Tdarr node or refresh local plugins.
 7. Add `Media Optimizer` to the target classic plugin stack, or select it through Tdarr's Run Classic Plugin flow component.
 8. Start with `dryRun=true` and `logLevel=debug` for the first validation pass.
-9. Confirm the Tdarr log shows `media-optimizer-secure-arr-variables-2026-09-15-42` and the expected planned track table before allowing live processing.
+9. Confirm the Tdarr log shows `media-optimizer-resize-preset-safety-2026-09-16-46` and the expected planned track table before allowing live processing.
+
+Resizing uses one `scale` filter, which preserves display aspect ratio by adjusting sample aspect ratio as needed. Outputs are not forced to square pixels. Tdarr classic presets use a comma as the input/output delimiter; additional commas inside arguments can truncate the executed command even when quoted. Media Optimizer blocks such commands rather than risking lost tracks. This safeguard also applies to explicitly rendered metadata values and external input paths containing commas.
 
 ## Configure Sonarr And Radarr
 

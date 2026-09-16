@@ -4,6 +4,16 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ---
 
+## 2026-09-16 - Freohrskulblaka
+
+### Prevented classic preset truncation during resizing
+
+Removed the separate `setsar=1` filter from upscaling and 4K downscaling. The single `scale` filter preserves display aspect ratio through sample-aspect adjustment and avoids a filter-chain comma that Tdarr classic preset parsing interpreted as another input/output delimiter. The repeated Constantine test showed that the previous command was truncated before every audio and subtitle mapping, despite quotes around the filter expression.
+
+Command assembly now marks presets containing commas inside arguments as non-executable, preventing the same silent truncation from future filter chains, explicit metadata values, or external paths. Added local regression coverage for complete downstream mappings, unsafe-argument rejection, and optional real FFmpeg aspect-ratio checks on widescreen, 16:9, anamorphic, and 4K sources. The plugin version is now `0.1.5`.
+
+Runtime marker: `media-optimizer-resize-preset-safety-2026-09-16-46`.
+
 ## 2026-09-15 - Freohrskulblaka
 
 ### Added Sonarr title fallback for episodes without TVDB IDs

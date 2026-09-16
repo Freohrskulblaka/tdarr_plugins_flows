@@ -48,6 +48,9 @@ function buildFfmpegCommand(context) {
   outputArgs.push('-max_muxing_queue_size', '9999');
 
   const args = [...inputArgs, ...outputArgs];
+  if (args.some((arg) => String(arg).includes(','))) {
+    unsupportedSteps.push('An FFmpeg argument contains a comma, which Tdarr classic preset parsing would truncate. Processing is blocked to prevent stream loss.');
+  }
   const preset = args.length > 0 ? `, ${args.join(' ')}` : '';
 
   return {
