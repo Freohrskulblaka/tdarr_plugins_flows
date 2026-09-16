@@ -52,12 +52,55 @@ function buildFfmpegCommand(context) {
     unsupportedSteps.push('An FFmpeg argument contains a comma, which Tdarr classic preset parsing would truncate. Processing is blocked to prevent stream loss.');
   }
   const preset = args.length > 0 ? `, ${args.join(' ')}` : '';
+  let custom = null;
+  const restorationTrack = plan.video?.tracks.find((track) => track.restoreDynamicHdr);
+  if (restorationTrack) {
+    const fs = require('fs');
+    const path = require('path');
+    const cliPath = process.env.MEDIA_OPTIMIZER_HDR_RUNNER_PATH;
+    const outputPath = context.otherArguments?.cacheFilePath;
+    const sourcePath = context.file?._id || context.file?.file;
+    if (!cliPath || !path.isAbsolute(cliPath) || !fs.existsSync(cliPath)
+      || !path.basename(cliPath).toLowerCase().includes('ffmpeg')) {
+      unsupportedSteps.push('Dynamic HDR restoration requires MEDIA_OPTIMIZER_HDR_RUNNER_PATH: an absolute path to a Python 3.10+ executable alias whose name includes ffmpeg (for Tdarr progress reporting).');
+    }
+    if (!outputPath || !path.isAbsolute(outputPath) || path.resolve(outputPath) === path.resolve(sourcePath || '.')) {
+      unsupportedSteps.push('Dynamic HDR restoration requires a separate, absolute Tdarr cacheFilePath.');
+    }
+    warnings.push('Experimental native-4K restoration: one video encode and four compressed-video-sized temporary writes. Unsupported or invalid metadata will fail the job without accepting the output.');
+    if (!context.settings.dryRun && plan.isValid && plan.shouldProcess && unsupportedSteps.length === 0) {
+      const workDir = fs.mkdtempSync(path.join(path.dirname(outputPath), '.media-optimizer-hdr-'));
+      const tool = (name, fallback) => process.env[`MEDIA_OPTIMIZER_HDR_${name}_PATH`] || fallback;
+      const mkvpropedit = tool('MKVPROPEDIT', context.otherArguments?.mkvpropeditPath || 'mkvpropedit');
+      const sibling = (name) => path.isAbsolute(mkvpropedit)
+        ? path.join(path.dirname(mkvpropedit), `${name}${path.extname(mkvpropedit)}`) : name;
+      const unquote = (arg) => /^".*"$/.test(arg) ? arg.slice(1, -1).replace(/\\"/g, '"') : String(arg);
+      const jobPath = path.join(workDir, 'job.json');
+      fs.writeFileSync(jobPath, JSON.stringify({
+        version: 1, sourcePath, outputPath, workDir,
+        type: restorationTrack.hdr.hasDolbyVision ? 'dolbyVision' : 'hdr10plus',
+        width: restorationTrack.width, height: restorationTrack.height,
+        targetKbps: restorationTrack.bitrate.selected.targetKbps,
+        inputArgs: inputArgs.map(unquote), outputArgs: outputArgs.map(unquote),
+        tools: {
+          ffmpeg: tool('FFMPEG', context.otherArguments?.ffmpegPath || 'ffmpeg'),
+          ffprobe: tool('FFPROBE', context.otherArguments?.ffprobePath || 'ffprobe'),
+          mkvmerge: tool('MKVMERGE', sibling('mkvmerge')),
+          mkvextract: tool('MKVEXTRACT', sibling('mkvextract')),
+          mkvpropedit,
+          dovi: tool('DOVI', 'dovi_tool'), hdr10plus: tool('HDR10PLUS', 'hdr10plus_tool'),
+        },
+      }), { flag: 'wx' });
+      custom = { cliPath, args: [path.resolve(__dirname, 'dynamic_hdr.py'), jobPath], outputPath };
+    }
+  }
 
   return {
     preset,
     args,
     unsupportedSteps,
     warnings,
+    custom,
     isExecutable: unsupportedSteps.length === 0,
   };
 }

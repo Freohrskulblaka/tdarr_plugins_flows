@@ -6,7 +6,7 @@
  * Changelog: ../../../docs/media_optimizer_changelog.md
  */
 
-const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-main-audio-source-2026-09-16-48';
+const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-dynamic-hdr-opt-in-2026-09-16-49';
 
 function loadOptimizerModules() {
   const path = require('path');
@@ -40,7 +40,7 @@ function details() {
     Type: 'Video, Audio, Subtitle',
     Operation: 'Transcode',
     Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, normalized compatibility tracks, commentary and descriptive-audio handling, subtitle retention and external subtitle import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through Tdarr variables, worker environment variables, or a fallback connection profile. Already-compliant files return no-process with a compact summary instead of reprocessing.',
-    Version: '0.1.7',
+    Version: '0.1.8',
     Tags: 'pre-processing, ffmpeg, media optimizer, configurable',
     Inputs: [
       {
@@ -118,13 +118,14 @@ function details() {
           options: [
             'Auto Preserve HDR',
             'Copy HDR Video',
+            'Compress And Restore Dynamic HDR',
           ],
         },
         tooltip: `
           Select how HDR video is handled when video transcoding would otherwise be needed.\\n
           Auto Preserve HDR: transcodes HDR10 and HLG with their source color signaling. HDR10+ and Dolby Vision video is copied so dynamic metadata is not silently lost.\\n
           Copy HDR Video: always copies HDR video without re-encoding it. Audio, subtitle, chapter, attachment, and metadata changes may still be applied in a lossless remux.\\n
-          Dynamic HDR extraction and restoration belongs to a separate future processing workflow and is not performed by Media Optimizer.
+          Compress And Restore Dynamic HDR: experimental native-4K MKV compression with verified metadata restoration. Supports HDR10+ or Dolby Vision Profile 7 MEL converted to Profile 8.1, without resizing. Unsupported profiles or combinations remain copied. Requires the external runner and HDR tools documented in hdr_tooling.md; failed verification never accepts an HDR-less output.
         `,
       },
       {

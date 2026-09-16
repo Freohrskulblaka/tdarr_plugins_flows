@@ -156,9 +156,28 @@ function applyVideoTrackDecision(track, context, isPrimaryVideo) {
   }
 
   if (track.hdr.hasDynamicMetadata) {
+    const canRestore = settings.hdrPolicy === 'restoreDynamic'
+      && track.codec === 'hevc' && settings.targetCodec === 'hevc'
+      && settings.bitDepth === '10-Bit' && track.resolution.is4k
+      && context.analysis.file.container === 'mkv'
+      && !settings.downscale4k
+      && track.sourceIndex === context.analysis.streams.video.items[0]?.index
+      && !(track.hdr.hasDolbyVision && track.hdr.hasHdr10Plus)
+      && (!track.hdr.hasDolbyVision || track.hdr.dolbyVisionProfile === 7);
+
+    if (canRestore) {
+      const decision = applyVideoCompatibilityDecision(track, context);
+      if (decision.action === 'transcode') {
+        decision.restoreDynamicHdr = true;
+        decision.reasons.push('Experimental dynamic HDR restoration will verify native-resolution metadata before accepting the encoded output. Dolby Vision requires a full-file MEL check.');
+      }
+      return decision;
+    }
     return Object.assign({}, track, {
       action: 'copy',
-      reasons: [`${track.hdr.type === 'dolbyVision' ? 'Dolby Vision' : 'HDR10+'} dynamic metadata requires a separate restoration workflow; the video will be copied so that metadata is not lost.`],
+      reasons: [settings.hdrPolicy === 'restoreDynamic'
+        ? 'Dynamic HDR is outside the experimental native-4K restoration scope; the video will be copied so that metadata is not lost.'
+        : `${track.hdr.type === 'dolbyVision' ? 'Dolby Vision' : 'HDR10+'} dynamic metadata requires a separate restoration workflow; the video will be copied so that metadata is not lost.`],
     });
   }
 
@@ -247,7 +266,7 @@ function applyVideoCompatibilityDecision(track, context) {
   if (action === 'transcode') {
     const encoderArgs = createVideoEncoderArgs({ track, settings, bitrate });
 
-    if (track.hdr.isHdr && settings.hdrPolicy === 'autoPreserve') {
+    if (track.hdr.isHdr && ['autoPreserve', 'restoreDynamic'].includes(settings.hdrPolicy)) {
       const hdrLabel = track.hdr.type === 'dolbyVision'
         ? `Dolby Vision Profile ${track.hdr.dolbyVisionProfile || 'unknown'}`
         : track.hdr.type.toUpperCase();
@@ -299,7 +318,7 @@ function createVideoEncoderArgs({ track, settings, bitrate }) {
     colorSpace: '-colorspace',
   };
 
-  if (settings.hdrPolicy === 'autoPreserve') {
+  if (['autoPreserve', 'restoreDynamic'].includes(settings.hdrPolicy)) {
     Object.entries(colorArgs).forEach(([property, option]) => {
       const value = track.hdr[property];
 

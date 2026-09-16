@@ -6,6 +6,14 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ## 2026-09-16 - Freohrskulblaka
 
+### Added opt-in dynamic HDR compression and restoration
+
+Added `Compress And Restore Dynamic HDR` without changing the default or either existing HDR mode. Experimental native-4K MKV restoration supports HDR10+ or full-file Dolby Vision Profile 7 MEL converted to Profile 8.1. Resizing, unsupported profiles, and dual-format inputs remain copied. Unsupported full-file metadata or tool failures stop the job without accepting a degraded output.
+
+The classic custom-CLI runner reuses the complete existing audio/subtitle/attachment/chapter/metadata command, performs one video encode, injects metadata, and verifies frame correspondence, synchronization, track headers/tags, chapters, attachments, audio/subtitle payloads, and a full video decode before publishing the cache file. Requires worker-side Python 3.10+, MKVToolNix, and pinned HDR tools only for this new mode. Version: `0.1.8`.
+
+Runtime marker: `media-optimizer-dynamic-hdr-opt-in-2026-09-16-49`.
+
 ### Linked compatibility audio to its main soundtrack
 
 Compatibility selection now checks source identity rather than blindly reusing lower-quality AC3/AAC streams with matching language and channels. Both derivatives use the best eligible main source per language variant, with no stereo-to-surround upmix. Identified commentary and descriptive tracks remain outside main-source selection.

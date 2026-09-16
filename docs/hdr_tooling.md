@@ -1,81 +1,84 @@
 # Dynamic HDR Tooling
 
-Pinned dynamic-HDR tools are installed for a separate future processing plugin. They are not runtime dependencies of Media Optimizer.
+Media Optimizer 0.1.8 adds the experimental `Compress And Restore Dynamic HDR` option. `Auto Preserve HDR` remains the default; it and `Copy HDR Video` retain their existing behavior and do not require these extra tools.
 
-## Media Optimizer Boundary
+## Supported Scope
 
-Media Optimizer currently:
+- Native-resolution 4K, 10-bit HEVC, HDR10-compatible MKV input.
+- Dolby Vision Profile 7 **MEL**, verified across the full file, converted to Profile 8.1.
+- HDR10+ with metadata covering every frame in presentation order.
+- One dynamic format per file. Combined Dolby Vision + HDR10+, resizing, cropping, FEL, Profile 5, and other Dolby Vision profiles are not supported by this initial restoration path.
 
-- Detects HDR10, HLG, HDR10+, and Dolby Vision video.
-- Can transcode static HDR10 and HLG while carrying source color signaling into the output command.
-- Copies HDR10+ and Dolby Vision video so their dynamic metadata is not silently discarded.
-- Does not extract metadata, write sidecar manifests, inject metadata, or call the tools documented below.
+Out-of-scope planning configurations copy the video while retaining other domain changes. A full-file metadata check may reveal an unsupported input that cannot be identified from the initial scan; that job fails before encoding. Select an existing copy mode for those files. Never silently accept an HDR-less replacement.
 
-A future regular Tdarr plugin may use these tools to preserve dynamic metadata around a single video encode.
+## Worker Prerequisites
 
-## Pinned Tools
+Install on **every Tdarr worker that may execute this option**, not just the server:
 
-| Tool | Version | Windows SHA-256 | Linux musl SHA-256 |
-| --- | --- | --- | --- |
-| `dovi_tool` | 2.3.4 | `0d9733d311dfe49f9dca0c350f7e6d978182673d333c6f07f7365daf9e6c81eb` | `1844258e13c26607b32224bf1fa82b595d3b35949f5467405fda560daad32b3f` |
-| `hdr10plus_tool` | 1.7.2 | `82b2d560073941b14c6511a431f429e33e134e5caefb60d7e8f6f6e6da8e16ba` | `06385f37a639d61ba21d4be3150c863846933bc3b58110e094d8fc8f1c2249f2` |
+| Tool | Requirement |
+| --- | --- |
+| Python | 3.10 or newer, standard library only |
+| FFmpeg / FFprobe | Tested with 7.1.1; encoder must support native 10-bit HEVC |
+| MKVToolNix | Tested with 85.0: `mkvmerge`, `mkvextract`, `mkvpropedit` |
+| `dovi_tool` | Pinned 2.3.4, required for Dolby Vision jobs |
+| `hdr10plus_tool` | Pinned 1.7.2, required for HDR10+ jobs |
 
-Official releases:
+Official releases: [dovi_tool 2.3.4](https://github.com/quietvoid/dovi_tool/releases/tag/2.3.4), [hdr10plus_tool 1.7.2](https://github.com/quietvoid/hdr10plus_tool/releases/tag/1.7.2), [MKVToolNix](https://mkvtoolnix.download/downloads.html), [Python](https://www.python.org/downloads/).
 
-- `dovi_tool`: <https://github.com/quietvoid/dovi_tool/releases/tag/2.3.4>
-- `hdr10plus_tool`: <https://github.com/quietvoid/hdr10plus_tool/releases/tag/1.7.2>
+Verify versions from the worker/container itself. Visibility on a network share does not prove that a tool can execute. Persist container installations and aliases in the worker image or its startup configuration.
 
-## Installed Paths
+## Runner Setup
 
-Windows workstation:
+Tdarr must launch an external Python interpreter, not its own bundled executable. The interpreter alias must include `ffmpeg` in its filename so Tdarr recognizes forwarded FFmpeg progress output.
 
-```text
-D:\Tdarr\tools\hdr\dovi_tool.exe
-D:\Tdarr\tools\hdr\hdr10plus_tool.exe
-D:\Tdarr\mkvtoolnix\mkvmerge.exe
+Linux, after installing Python:
+
+```sh
+ln -s "$(command -v python3)" /usr/local/bin/media_optimizer_hdr_ffmpeg
+/usr/local/bin/media_optimizer_hdr_ffmpeg --version
 ```
 
-KRATOS Tdarr server share:
-
-```text
-\\KRATOS\appdata\MediaAutomation\tdarr\server\tools\hdr\dovi_tool
-\\KRATOS\appdata\MediaAutomation\tdarr\server\tools\hdr\hdr10plus_tool
-```
-
-Expected paths inside the Tdarr server container:
-
-```text
-/app/server/tools/hdr/dovi_tool
-/app/server/tools/hdr/hdr10plus_tool
-```
-
-The Linux binaries need executable permission inside the environment that runs them.
-
-## Verification
-
-Windows:
+Windows, create the alias beside Python so its DLLs and standard library remain discoverable:
 
 ```powershell
-& 'D:\Tdarr\tools\hdr\dovi_tool.exe' --version
-& 'D:\Tdarr\tools\hdr\hdr10plus_tool.exe' --version
-& 'D:\Tdarr\mkvtoolnix\mkvmerge.exe' --version
+$python = (Get-Command python.exe).Source
+$alias = Join-Path (Split-Path $python) 'media_optimizer_hdr_ffmpeg.exe'
+New-Item -ItemType HardLink -Path $alias -Target $python
+& $alias --version
 ```
 
-Tdarr server container:
+Set `MEDIA_OPTIMIZER_HDR_RUNNER_PATH` on the worker to that absolute alias path and restart the worker. Do not point it at FFmpeg itself.
 
-```bash
-/app/server/tools/hdr/dovi_tool --version
-/app/server/tools/hdr/hdr10plus_tool --version
-```
+## Tool Paths
 
-The workstation and KRATOS share installations have been checked. Direct execution from the Tdarr container remains to be validated before a future plugin depends on them.
+These optional worker environment variables override tool locations:
 
-## Future Plugin Requirements
+| Variable | Tool |
+| --- | --- |
+| `MEDIA_OPTIMIZER_HDR_FFMPEG_PATH` | FFmpeg (otherwise Tdarr's provided path or worker PATH) |
+| `MEDIA_OPTIMIZER_HDR_FFPROBE_PATH` | FFprobe |
+| `MEDIA_OPTIMIZER_HDR_MKVMERGE_PATH` | mkvmerge |
+| `MEDIA_OPTIMIZER_HDR_MKVEXTRACT_PATH` | mkvextract |
+| `MEDIA_OPTIMIZER_HDR_MKVPROPEDIT_PATH` | mkvpropedit (otherwise Tdarr's provided path or worker PATH) |
+| `MEDIA_OPTIMIZER_HDR_DOVI_PATH` | dovi_tool 2.3.4 |
+| `MEDIA_OPTIMIZER_HDR_HDR10PLUS_PATH` | hdr10plus_tool 1.7.2 |
 
-A dynamic-HDR plugin should:
+Absent overrides, tools use worker PATH; mkvmerge/mkvextract also resolve beside an absolute mkvpropedit path. Linux binaries need executable permission. No Arr connection details are written to the HDR job descriptor.
 
-- Extract and validate metadata before any video encode.
-- Perform no more than one lossy video encode.
-- Restore metadata only after the encoded video is complete.
-- Keep unsupported Dolby Vision profiles in copy mode until their conversion path is proven.
-- Verify streams, duration, synchronization, and restored dynamic metadata before replacing the source file.
+## Processing And Space
+
+1. Check tools, free space, native geometry, source metadata, and full-file frame correspondence.
+2. Encode video once with the existing complete Media Optimizer command. Audio, subtitles, fonts, chapters, and metadata use their existing planners/renderers.
+3. Stream-copy the smaller encoded video to HEVC, inject verified metadata, then remux it with the encoded non-video tracks.
+4. Restore the video UID/tags and static HDR color/mastering headers. Verify dynamic metadata exactly, track order/headers/tags, chapters, attachment records, packet timelines, and audio/subtitle payload hashes.
+5. Fully decode the restored video before publishing Tdarr's cache output. Tdarr remains responsible for final source replacement.
+
+This involves **four compressed-video-sized writes**, plus encoded audio and small metadata/timestamp files. It does not dump the original remux video or encode video four times. The space check is conservative when stream sizes are missing. Extraction and final decoding add read/processing time; do not treat a quiet verification phase as a stalled encode.
+
+Normal failure or cancellation cleans staging. Linux children are tied to the runner's lifetime. A force-kill/power loss may leave a `.media-optimizer-hdr-*` cache directory; clean it only after verifying no job owns it. Windows hard-kill cleanup and worker progress/stall handling still require live Tdarr validation.
+
+## Validation Boundary
+
+Use a separate testing library, untouched sources, and `dryRun=true` first. Confirm supported native-4K planning and verify worker-side execution before live processing.
+
+Local short-clip tests do not certify full-movie synchronization, HDR playback, hardware-specific behavior, or Tdarr custom-CLI replacement/cancellation. Keep existing modes as the rollback path until those checks pass.

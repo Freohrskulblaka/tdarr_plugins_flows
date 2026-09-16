@@ -11,7 +11,7 @@ function createResponse(context) {
 
   return {
     processFile: canExecute,
-    preset: canExecute ? command.preset : '',
+    preset: canExecute && !command.custom ? command.preset : '',
     container: '.mkv',
     handBrakeMode: false,
     FFmpegMode: canExecute,
@@ -19,6 +19,7 @@ function createResponse(context) {
     cliToUse: canExecute ? 'ffmpeg' : '',
     reQueueAfter: false,
     infoLog: context.log.toString(),
+    ...(canExecute && command.custom ? { custom: command.custom } : {}),
   };
 }
 

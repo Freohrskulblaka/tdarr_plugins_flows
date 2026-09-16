@@ -29,6 +29,7 @@ const VIDEO_CODEC_PROFILES = {
 const HDR_HANDLING_PROFILES = {
   'Auto Preserve HDR': {hdrPolicy: 'autoPreserve'},
   'Copy HDR Video': {hdrPolicy: 'copyHdr'},
+  'Compress And Restore Dynamic HDR': {hdrPolicy: 'restoreDynamic'},
 };
 
 const AUDIO_PROFILES = {

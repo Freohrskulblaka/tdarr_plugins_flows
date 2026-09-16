@@ -8,6 +8,8 @@ Deployable Tdarr classic plugin package for Media Optimizer.
 - `media_optimizer/`: support modules grouped by runtime concerns, pipeline orchestration, media domains, integrations, and utilities.
 - `build_release.ps1`: creates a ready-to-extract release archive.
 
+Release archives also include this README and, when built from the repository, `HDR_SETUP.md` with optional dynamic-HDR worker setup. Python bytecode/cache files are excluded.
+
 The `Local/` and `media_optimizer/` folders mirror their final locations under Tdarr's `Plugins/` directory.
 
 ## Deploy To Tdarr
@@ -46,7 +48,7 @@ Do not replace or copy the `methods/` folder. Tdarr supplies it.
 6. Restart the Tdarr node or refresh local plugins.
 7. Add `Media Optimizer` to the target classic plugin stack, or select it through Tdarr's Run Classic Plugin flow component.
 8. Start with `dryRun=true` and `logLevel=debug` for the first validation pass.
-9. Confirm the Tdarr log shows `media-optimizer-main-audio-source-2026-09-16-48` and the expected planned track table before allowing live processing.
+9. Confirm the Tdarr log shows `media-optimizer-dynamic-hdr-opt-in-2026-09-16-49` and the expected planned track table before allowing live processing.
 
 Resizing uses one `scale` filter, which preserves display aspect ratio by adjusting sample aspect ratio as needed. Outputs are not forced to square pixels. Tdarr classic presets use a comma as the input/output delimiter; additional commas inside arguments can truncate the executed command even when quoted. Media Optimizer blocks such commands rather than risking lost tracks. This safeguard also applies to explicitly rendered metadata values and external input paths containing commas.
 
@@ -104,6 +106,10 @@ Upgrades replace both the entrypoint and the complete support folder. Do not mix
 
 To roll back, stop or pause Tdarr again, remove the failed entrypoint and support folder, restore both items from the same backup, and restart or refresh Tdarr.
 
-Media Optimizer safely copies HDR10+ and Dolby Vision video because restoring their dynamic metadata requires a separate process. See [`../../docs/hdr_tooling.md`](../../docs/hdr_tooling.md) for the installed tool versions and the boundary for that future workflow.
+`Auto Preserve HDR` remains the default and copies dynamic HDR video. `Copy HDR Video` remains available and unchanged. The new `Compress And Restore Dynamic HDR` option is experimental and requires extra worker-side tooling; normal modes do not require Python or dynamic-HDR tools.
+
+The new mode supports native-resolution 4K MKV video with HDR10+, or Dolby Vision Profile 7 MEL converted to Profile 8.1. It does not resize, crop, process FEL/Profile 5, or restore combined Dolby Vision + HDR10+. Unsupported configurations stay in copy mode. A full-file check rejects unsupported metadata before encoding; restoration failures fail the job without publishing the cache output. Reuse the original source when testing this option.
+
+See [`../../docs/hdr_tooling.md`](../../docs/hdr_tooling.md) for worker setup, environment variables, staging space, and verification boundaries. One video encode is followed by stream-copy extraction, injection, remux, and a full video-decode check. That entails four compressed-video-sized writes, not four encodes.
 
 Prefer variables over the plugin-input fallback. Do not commit real hosts, API keys, runtime exports, logs, or media samples.
