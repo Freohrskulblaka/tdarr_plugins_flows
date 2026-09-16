@@ -6,6 +6,14 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ## 2026-09-16 - Freohrskulblaka
 
+### Calculated resize bitrate before encoding
+
+Upscaling and 4K downscaling now calculate their bitrate profiles from the expected even-pixel output dimensions within the 1920x1080 boundary. This matches the native-resolution calculation used when Tdarr checks the finished output. The corrected Constantine run exposed a second encode because its first pass targeted the full boundary while its follow-up used the smaller widescreen frame.
+
+Added regression coverage for first-pass bitrate targets and compatible HEVC follow-up decisions across widescreen, 16:9, anamorphic, and 4K inputs, with exact output dimensions checked through optional real FFmpeg tests. No resize filter or stream mappings changed. The plugin version is now `0.1.6`.
+
+Runtime marker: `media-optimizer-resized-bitrate-2026-09-16-47`.
+
 ### Prevented classic preset truncation during resizing
 
 Removed the separate `setsar=1` filter from upscaling and 4K downscaling. The single `scale` filter preserves display aspect ratio through sample-aspect adjustment and avoids a filter-chain comma that Tdarr classic preset parsing interpreted as another input/output delimiter. The repeated Constantine test showed that the previous command was truncated before every audio and subtitle mapping, despite quotes around the filter expression.

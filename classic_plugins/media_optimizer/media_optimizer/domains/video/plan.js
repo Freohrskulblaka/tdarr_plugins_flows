@@ -337,6 +337,8 @@ function createBitratePlan({ width, height, frameRate, bitRate, bitrateSource, f
       : 0;
     const targetProfile = {
       name,
+      width: targetWidth,
+      height: targetHeight,
       targetKbps,
       maxKbps: roundToNearestHundred(targetKbps * 1.25),
       isCalculable: targetKbps > 0,
@@ -350,7 +352,14 @@ function createBitratePlan({ width, height, frameRate, bitRate, bitrateSource, f
     : fullHdCompressionRate;
   const currentKbps = Math.floor(bitRate / 1000);
   const native = createTargetProfile('native', width, height, nativeCompressionRate);
-  const fullHd = createTargetProfile('fullHd', 1920, 1080, fullHdCompressionRate);
+  // Match scale's nearest-even fit; SAR is preserved separately by the filter.
+  const resizedWidth = width > 0 && height > 0
+    ? Math.min(1920, Math.round(1080 * width / height / 2) * 2)
+    : 0;
+  const resizedHeight = width > 0 && height > 0
+    ? Math.min(1080, Math.round(1920 * height / width / 2) * 2)
+    : 0;
+  const fullHd = createTargetProfile('fullHd', resizedWidth, resizedHeight, fullHdCompressionRate);
   const bitrate = {
     current: {
       kbps: currentKbps,
