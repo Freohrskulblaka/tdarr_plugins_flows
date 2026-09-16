@@ -5,6 +5,7 @@
  * Description: Builds final audio track copy, removal, generation, ordering, and default decisions.
  */
 
+const {createHash} = require('crypto');
 const {
   createLanguageLabel: createAudioLanguageLabel,
   normalizeLanguageForVariant: normalizeAudioLanguage,
@@ -78,6 +79,14 @@ function createAudioTrack(stream, sourceOrder, context) {
   const channelFamily = audioAnalysis.channelFamily;
   const codec = audioAnalysis.codec;
   const formatKey = audioAnalysis.formatKey || codec;
+  const qualityRank = AUDIO_QUALITY_RANK[formatKey] ?? 999;
+  const sourceIdentity = /^v1:([1-9][0-9]?):([0-9]{1,3}):[a-f0-9]{64}$/.exec(audioAnalysis.sourceKey);
+  const sourceChannels = sourceIdentity ? Number(sourceIdentity[1]) : channels;
+  const sourceQualityRank = sourceIdentity ? Number(sourceIdentity[2]) : qualityRank;
+  const sourceKey = sourceIdentity ? audioAnalysis.sourceKey : `v1:${channels}:${qualityRank}:` + createHash('sha256')
+    .update(JSON.stringify([
+      stream.index, codec, formatKey, channels, language, languageVariant, title, audioAnalysis.profile, audioAnalysis.bitrate,
+    ])).digest('hex');
   const desiredTitle = createAudioTitle({channelFamily, codec, targetCodec: codec, formatKey, languageLabel});
 
   return {
@@ -87,7 +96,12 @@ function createAudioTrack(stream, sourceOrder, context) {
     codec,
     targetCodec: codec,
     formatKey,
-    qualityRank: AUDIO_QUALITY_RANK[formatKey] ?? 999,
+    qualityRank,
+    sourceKey,
+    sourceChannels,
+    sourceQualityRank,
+    isCompatibility: Boolean(sourceIdentity) && (sourceChannels !== channels || sourceQualityRank !== qualityRank)
+      && (codec === 'ac3' || codec === 'aac'),
     profile: audioAnalysis.profile,
     language,
     languageVariant,
@@ -117,12 +131,16 @@ function selectFinalAudioTracks(eligibleSources, sourceGroups, context) {
   const settings = context.settings.audio;
 
   if (settings.preserveOriginals) {
-    return eligibleSources.map((track) => ({...track, role: 'original'}));
+    return eligibleSources.map((track) => ({
+      ...track,
+      role: (settings.createMissingFiveOne || settings.createMissingStereo) && track.isCompatibility
+        ? 'compatibility' : 'original',
+    }));
   }
 
   const selectedTracks = [];
 
-  sourceGroups.forEach(({sources}) => {
+  sourceGroups.forEach(({sources, bestSource, bestSurroundSource}) => {
     if (settings.keepBestSurround) {
       const bestNativeTrack = chooseBestAudioSource(sources.filter((track) => {
         return track.channelFamily === settings.keepBestSurround && track.qualityRank <= AUDIO_QUALITY_RANK.dts;
@@ -135,7 +153,7 @@ function selectFinalAudioTracks(eligibleSources, sourceGroups, context) {
 
     if (settings.createMissingFiveOne) {
       const fiveOneTrack = chooseBestAudioSource(sources.filter((track) => {
-        return track.channelFamily === '5.1' && track.codec === 'ac3';
+        return track.channelFamily === '5.1' && track.codec === 'ac3' && track.sourceKey === bestSurroundSource?.sourceKey;
       }));
 
       if (fiveOneTrack) {
@@ -145,7 +163,7 @@ function selectFinalAudioTracks(eligibleSources, sourceGroups, context) {
 
     if (settings.createMissingStereo) {
       const stereoTrack = chooseBestAudioSource(sources.filter((track) => {
-        return track.channelFamily === 'stereo' && track.codec === 'aac';
+        return track.channelFamily === 'stereo' && track.codec === 'aac' && track.sourceKey === bestSource.sourceKey;
       }));
 
       if (stereoTrack) {
@@ -162,35 +180,34 @@ function createAudioSourceGroups(eligibleSources, languageOrder) {
     const languageSources = eligibleSources.filter((track) => track.language === language);
     const languageVariants = Array.from(new Set(languageSources.map((track) => track.languageVariant || '')));
 
-    return languageVariants.map((languageVariant) => ({
-      language,
-      languageVariant,
-      sources: languageSources.filter((track) => track.languageVariant === languageVariant),
-    }));
+    return languageVariants.map((languageVariant) => {
+      const sources = languageSources.filter((track) => track.languageVariant === languageVariant);
+      return {
+        language, languageVariant, sources,
+        bestSource: chooseBestAudioSource(sources, true),
+        bestSurroundSource: chooseBestAudioSource(sources.filter((track) => track.channels >= 6), true),
+      };
+    });
   });
 }
 
 function createGeneratedAudioTracks(selectedTracks, sourceGroups, context) {
   const generatedTracks = [];
 
-  sourceGroups.forEach(({language, languageVariant, sources}) => {
-    const bestSource = chooseBestAudioSource(sources);
+  sourceGroups.forEach(({language, languageVariant, bestSource, bestSurroundSource}) => {
 
     if (!bestSource) {
       return;
     }
 
-    if (context.settings.audio.createMissingFiveOne && !hasAudioFormat(selectedTracks, language, languageVariant, '5.1', 'ac3')) {
-      const sourceTrack = chooseBestAudioSource(sources.filter((track) => {
-        return track.channelFamily === '7.1' || track.channelFamily === '5.1';
-      }));
-
-      if (sourceTrack) {
-        generatedTracks.push(createGeneratedAudioTrack(sourceTrack, language, 6, '5.1'));
-      }
+    if (context.settings.audio.createMissingFiveOne
+      && bestSurroundSource
+      && !hasAudioFormat(selectedTracks, language, languageVariant, '5.1', 'ac3', bestSurroundSource.sourceKey)) {
+      generatedTracks.push(createGeneratedAudioTrack(bestSurroundSource, language, 6, '5.1'));
     }
 
-    if (context.settings.audio.createMissingStereo && !hasAudioFormat(selectedTracks, language, languageVariant, 'stereo', 'aac')) {
+    if (context.settings.audio.createMissingStereo
+      && !hasAudioFormat(selectedTracks, language, languageVariant, 'stereo', 'aac', bestSource.sourceKey)) {
       generatedTracks.push(createGeneratedAudioTrack(bestSource, language, 2, 'stereo'));
     }
   });
@@ -212,6 +229,9 @@ function createGeneratedAudioTrack(sourceTrack, language, channels, channelFamil
     targetCodec,
     formatKey: targetCodec,
     qualityRank: AUDIO_QUALITY_RANK[targetCodec],
+    sourceKey: sourceTrack.sourceKey,
+    sourceChannels: sourceTrack.sourceChannels,
+    sourceQualityRank: sourceTrack.sourceQualityRank,
     profile: sourceTrack.profile,
     language,
     languageVariant,
@@ -227,7 +247,7 @@ function createGeneratedAudioTrack(sourceTrack, language, channels, channelFamil
     currentDefault: false,
     generated: true,
     bitrate: null,
-    reasons: [`Missing ${channelFamily} audio will be generated from source track ${sourceTrack.sourceIndex}.`],
+    reasons: [`${channelFamily} compatibility audio will be generated from main source track ${sourceTrack.sourceIndex}.`],
   };
 }
 
@@ -312,9 +332,14 @@ function assignAudioOutputIndexes(tracks) {
   });
 }
 
-function chooseBestAudioSource(tracks) {
+function chooseBestAudioSource(tracks, useSourceIdentity = false) {
   const sortedTracks = tracks.slice().sort((left, right) => {
     const comparisons = [
+      // Retain the quality of a known parent even after that parent was removed.
+      ...(useSourceIdentity ? [
+        right.sourceChannels - left.sourceChannels,
+        left.sourceQualityRank - right.sourceQualityRank,
+      ] : []),
       right.channels - left.channels,
       left.qualityRank - right.qualityRank,
       (right.bitrate || 0) - (left.bitrate || 0),
@@ -327,12 +352,13 @@ function chooseBestAudioSource(tracks) {
   return sortedTracks[0] || null;
 }
 
-function hasAudioFormat(tracks, language, languageVariant, channelFamily, codec) {
+function hasAudioFormat(tracks, language, languageVariant, channelFamily, codec, sourceKey) {
   return tracks.some((track) => {
     return track.language === language
       && track.languageVariant === (languageVariant || '')
       && track.channelFamily === channelFamily
-      && track.targetCodec === codec;
+      && track.targetCodec === codec
+      && (!sourceKey || track.sourceKey === sourceKey);
   });
 }
 

@@ -78,6 +78,7 @@ function enrichAudioStream(stream, mediaInfoAudioTrack) {
     profile,
     currentDefault,
     bitrate,
+    sourceKey: stream.tags?.MEDIA_OPTIMIZER_AUDIO_SOURCE || stream.tags?.media_optimizer_audio_source || '',
     isCommentary: trackIntent.isCommentary,
     isDescriptive: trackIntent.isDescriptive,
     commentaryReasons: trackIntent.commentaryReasons,

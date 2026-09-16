@@ -6,6 +6,14 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ## 2026-09-16 - Freohrskulblaka
 
+### Linked compatibility audio to its main soundtrack
+
+Compatibility selection now checks source identity rather than blindly reusing lower-quality AC3/AAC streams with matching language and channels. Both derivatives use the best eligible main source per language variant, with no stereo-to-surround upmix. Identified commentary and descriptive tracks remain outside main-source selection.
+
+Added a versioned `MEDIA_OPTIMIZER_AUDIO_SOURCE` stream tag containing parent channel count, quality rank, and hashed identity. It allows follow-up runs to reuse generated tracks after the original source is removed, keeps retained-surround and preserve-all profiles stable, and invalidates derivatives when a better replacement source is selected. Untagged legacy compatibility tracks may be regenerated once. The plugin version is now `0.1.7`; dynamic-HDR behavior is unchanged.
+
+Runtime marker: `media-optimizer-main-audio-source-2026-09-16-48`.
+
 ### Calculated resize bitrate before encoding
 
 Upscaling and 4K downscaling now calculate their bitrate profiles from the expected even-pixel output dimensions within the 1920x1080 boundary. This matches the native-resolution calculation used when Tdarr checks the finished output. The corrected Constantine run exposed a second encode because its first pass targeted the full boundary while its follow-up used the smaller widescreen frame.

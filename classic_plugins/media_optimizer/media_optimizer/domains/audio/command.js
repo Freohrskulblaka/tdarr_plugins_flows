@@ -31,6 +31,7 @@ function addAudioArgs(args, audioPlan, streamIndexes) {
     addStreamMetadata(args, 'a', outputIndex, {
       language: track.language,
       title: track.title,
+      MEDIA_OPTIMIZER_AUDIO_SOURCE: track.sourceKey,
     });
     addDisposition(args, 'a', outputIndex, {
       default: track.default,

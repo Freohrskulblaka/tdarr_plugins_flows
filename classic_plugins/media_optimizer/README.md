@@ -46,11 +46,19 @@ Do not replace or copy the `methods/` folder. Tdarr supplies it.
 6. Restart the Tdarr node or refresh local plugins.
 7. Add `Media Optimizer` to the target classic plugin stack, or select it through Tdarr's Run Classic Plugin flow component.
 8. Start with `dryRun=true` and `logLevel=debug` for the first validation pass.
-9. Confirm the Tdarr log shows `media-optimizer-resized-bitrate-2026-09-16-47` and the expected planned track table before allowing live processing.
+9. Confirm the Tdarr log shows `media-optimizer-main-audio-source-2026-09-16-48` and the expected planned track table before allowing live processing.
 
 Resizing uses one `scale` filter, which preserves display aspect ratio by adjusting sample aspect ratio as needed. Outputs are not forced to square pixels. Tdarr classic presets use a comma as the input/output delimiter; additional commas inside arguments can truncate the executed command even when quoted. Media Optimizer blocks such commands rather than risking lost tracks. This safeguard also applies to explicitly rendered metadata values and external input paths containing commas.
 
 Resize bitrate targets use the expected even-pixel dimensions fitted within 1920x1080, not the entire boundary. Widescreen output therefore uses the same pixel-based bitrate calculation before encoding and during the follow-up check, avoiding a second encode caused by a smaller post-resize target.
+
+## Main Audio And Compatibility Tracks
+
+Compatibility profiles use the best eligible main soundtrack within each language variant. Lower-quality AC3/AAC streams are not assumed to contain the same soundtrack merely because their language and codec match. When needed, AC3 5.1 and AAC stereo are generated from that main source; stereo-only sources are never upmixed to 5.1.
+
+The `MEDIA_OPTIMIZER_AUDIO_SOURCE` stream tag links compatibility tracks to their parent. It carries the parent's channel count, quality rank, and a hashed identity, not its filename or connection credentials. Matching generated tracks are reused on later runs even when the original 7.1 track was removed. Do not strip this tag if you want to preserve that association. Files produced before this release may need a one-time audio regeneration because their existing compatibility tracks cannot be verified.
+
+Commentary and descriptive tracks identified through titles or dispositions remain separate and are never compatibility sources. Untagged descriptive soundtracks cannot be reliably recognized from codec information alone; selecting the best main source reduces this risk but is not content-based audio detection.
 
 ## Configure Sonarr And Radarr
 
