@@ -6,6 +6,12 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ## 2026-09-16 - Freohrskulblaka
 
+### Discovered dynamic HDR tools automatically
+
+Standard worker layouts no longer require HDR path environment variables. Discover the Python alias and HDR binaries in the persistent server `tools/hdr/` directory, reuse Tdarr's supplied/bundled FFmpeg and FFprobe, and locate MKVToolNix through sibling paths or worker PATH. Explicit environment overrides remain available and authoritative for custom installations. External binaries still require separate installation. Version: `0.1.9`.
+
+Runtime marker: `media-optimizer-hdr-tool-discovery-2026-09-16-50`.
+
 ### Added opt-in dynamic HDR compression and restoration
 
 Added `Compress And Restore Dynamic HDR` without changing the default or either existing HDR mode. Experimental native-4K MKV restoration supports HDR10+ or full-file Dolby Vision Profile 7 MEL converted to Profile 8.1. Resizing, unsupported profiles, and dual-format inputs remain copied. Unsupported full-file metadata or tool failures stop the job without accepting a degraded output.

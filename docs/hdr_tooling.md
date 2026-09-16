@@ -1,6 +1,6 @@
 # Dynamic HDR Tooling
 
-Media Optimizer 0.1.8 adds the experimental `Compress And Restore Dynamic HDR` option. `Auto Preserve HDR` remains the default; it and `Copy HDR Video` retain their existing behavior and do not require these extra tools.
+Media Optimizer 0.1.8 adds the experimental `Compress And Restore Dynamic HDR` option; 0.1.9 adds automatic tool discovery. `Auto Preserve HDR` remains the default; it and `Copy HDR Video` retain their existing behavior and do not require these extra tools. Python and HDR binaries are installed separately, not bundled in the plugin release.
 
 ## Supported Scope
 
@@ -31,11 +31,12 @@ Verify versions from the worker/container itself. Visibility on a network share 
 
 Tdarr must launch an external Python interpreter, not its own bundled executable. The interpreter alias must include `ffmpeg` in its filename so Tdarr recognizes forwarded FFmpeg progress output.
 
-Linux, after installing Python:
+Linux with the standard persistent server mount, after installing Python and placing the HDR binaries in `/app/server/tools/hdr/`:
 
 ```sh
-ln -s "$(command -v python3)" /usr/local/bin/media_optimizer_hdr_ffmpeg
-/usr/local/bin/media_optimizer_hdr_ffmpeg --version
+test -e /app/server/tools/hdr/media_optimizer_hdr_ffmpeg ||
+  ln -s "$(command -v python3)" /app/server/tools/hdr/media_optimizer_hdr_ffmpeg
+/app/server/tools/hdr/media_optimizer_hdr_ffmpeg --version
 ```
 
 Windows, create the alias beside Python so its DLLs and standard library remain discoverable:
@@ -47,7 +48,7 @@ New-Item -ItemType HardLink -Path $alias -Target $python
 & $alias --version
 ```
 
-Set `MEDIA_OPTIMIZER_HDR_RUNNER_PATH` on the worker to that absolute alias path and restart the worker. Do not point it at FFmpeg itself.
+The alias is discovered in the server `tools/hdr/` directory or worker PATH. For a custom location outside both, set `MEDIA_OPTIMIZER_HDR_RUNNER_PATH` to its absolute path and restart the worker. Do not point it at FFmpeg itself. Keep the alias on a persistent mount; Python itself must also remain available after container recreation.
 
 ## Tool Paths
 
@@ -55,15 +56,16 @@ These optional worker environment variables override tool locations:
 
 | Variable | Tool |
 | --- | --- |
-| `MEDIA_OPTIMIZER_HDR_FFMPEG_PATH` | FFmpeg (otherwise Tdarr's provided path or worker PATH) |
+| `MEDIA_OPTIMIZER_HDR_RUNNER_PATH` | Python interpreter alias |
+| `MEDIA_OPTIMIZER_HDR_FFMPEG_PATH` | FFmpeg |
 | `MEDIA_OPTIMIZER_HDR_FFPROBE_PATH` | FFprobe |
 | `MEDIA_OPTIMIZER_HDR_MKVMERGE_PATH` | mkvmerge |
 | `MEDIA_OPTIMIZER_HDR_MKVEXTRACT_PATH` | mkvextract |
-| `MEDIA_OPTIMIZER_HDR_MKVPROPEDIT_PATH` | mkvpropedit (otherwise Tdarr's provided path or worker PATH) |
+| `MEDIA_OPTIMIZER_HDR_MKVPROPEDIT_PATH` | mkvpropedit |
 | `MEDIA_OPTIMIZER_HDR_DOVI_PATH` | dovi_tool 2.3.4 |
 | `MEDIA_OPTIMIZER_HDR_HDR10PLUS_PATH` | hdr10plus_tool 1.7.2 |
 
-Absent overrides, tools use worker PATH; mkvmerge/mkvextract also resolve beside an absolute mkvpropedit path. Linux binaries need executable permission. No Arr connection details are written to the HDR job descriptor.
+No path variables are required for the standard container layout. Discovery uses Tdarr's supplied tool paths first, then its bundled FFmpeg/FFprobe locations and worker PATH. FFprobe also resolves beside FFmpeg; mkvmerge/mkvextract resolve beside mkvpropedit. HDR tools and the Python alias resolve from the server `tools/hdr/` directory, the standard `/app/server/tools/hdr/` mount, or worker PATH. An explicit override is authoritative: invalid overrides fail rather than silently selecting another tool. Linux binaries need executable permission. No Arr connection details are written to the HDR job descriptor.
 
 ## Processing And Space
 
