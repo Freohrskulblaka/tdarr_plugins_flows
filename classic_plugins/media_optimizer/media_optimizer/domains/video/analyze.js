@@ -190,6 +190,7 @@ function analyzeVideoHdr(stream, mediaInfoVideoTrack) {
     hasDolbyVision,
     hasHdr10Plus,
     dolbyVisionProfile,
+    dolbyVisionCompatibilityId: Number(doviSideData.dv_bl_signal_compatibility_id || 0),
     colorPrimaries,
     colorTransfer,
     colorSpace,

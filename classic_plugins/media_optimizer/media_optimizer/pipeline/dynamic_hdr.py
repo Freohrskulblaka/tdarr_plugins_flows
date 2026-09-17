@@ -1,4 +1,4 @@
-"""Opt-in native-resolution HDR restoration runner. Created by: Freohrskulblaka."""
+"""Opt-in verified dynamic HDR restoration runner. Created by: Freohrskulblaka."""
 
 from pathlib import Path
 from fractions import Fraction
@@ -124,7 +124,14 @@ def run_job(job):
                 or video.get('pix_fmt') != 'yuv420p10le' or video.get('color_transfer') != 'smpte2084'
                 or video.get('color_primaries') != 'bt2020' or video.get('color_space') != 'bt2020nc'
                 or video.get('color_range') not in ('tv', 'pc')):
-            raise ValueError(f'Restoration requires unchanged native 10-bit HEVC HDR10 geometry: { {key: video.get(key) for key in ("width", "height", "pix_fmt", "color_transfer", "color_primaries", "color_space", "color_range")} }')
+            raise ValueError(f'Restoration requires the declared 10-bit HEVC HDR10 source geometry: { {key: video.get(key) for key in ("width", "height", "pix_fmt", "color_transfer", "color_primaries", "color_space", "color_range")} }')
+        target_width = job.get('outputWidth', job['width'])
+        target_height = job.get('outputHeight', job['height'])
+        resize = (target_width, target_height) != (job['width'], job['height'])
+        if resize and (job['type'] != 'dolbyVision'
+                       or (job['width'], job['height'], target_width, target_height) != (3840, 2160, 1920, 1080)
+                       or video.get('sample_aspect_ratio') != '1:1'):
+            raise ValueError('Dolby Vision resizing supports only square-pixel 3840x2160 to 1920x1080 without cropping.')
         source_info = identify(source)
         source_video = next(track for track in source_info['tracks'] if track['type'] == 'video')
         duration = float(probe['format']['duration'])
@@ -145,9 +152,45 @@ def run_job(job):
             original_metadata = work / 'original.rpu'
             command('dovi', ['extract-rpu', '-o', original_metadata, source])
             summary = command('dovi', ['info', '-i', original_metadata, '--summary'], True)
-            if not re.search(r'Profile:\s*7 \(MEL\)\s*\n', summary):
-                raise ValueError('Only full-file Dolby Vision Profile 7 MEL is supported; use a copy mode for other profiles.')
+            dovi = next((side for side in video.get('side_data_list', []) if side.get('dv_profile')), {})
+            mel = dovi.get('dv_profile') == 7 and re.search(r'Profile:\s*7 \(MEL\)\s*\n', summary)
+            profile81 = (dovi.get('dv_profile') == 8 and dovi.get('dv_bl_signal_compatibility_id') == 1
+                         and dovi.get('rpu_present_flag') == 1 and dovi.get('bl_present_flag') == 1
+                         and dovi.get('el_present_flag') == 0 and re.search(r'Profile:\s*8\s*\n', summary))
+            if not mel and not profile81:
+                raise ValueError('Only full-file Dolby Vision Profile 7 MEL or HDR10-compatible Profile 8.1 is supported; use a copy mode for other profiles.')
         expected_count, expected_identity = metadata(source, expected_metadata)
+        if resize:
+            config_path = work / 'active-area.json'
+            command('dovi', ['export', '-i', expected_metadata, '--data', f'level5={config_path}'])
+            config = json.loads(config_path.read_text(encoding='utf-8-sig'))
+            area = config['active_area']
+            # Export defaults to crop=true; resizing retains the letterbox bars.
+            area['crop'] = False
+            if not area.get('presets') or not area.get('edits'):
+                raise ValueError('Dolby Vision resizing requires active-area presets and frame ranges.')
+            for preset in area['presets']:
+                for key in ('left', 'right', 'top', 'bottom'):
+                    value = preset[key]
+                    if type(value) is not int or value < 0 or value % 2:
+                        raise ValueError('Dolby Vision resizing requires nonnegative, exactly divisible active-area offsets.')
+                    preset[key] = value // 2
+                if preset['left'] + preset['right'] >= target_width or preset['top'] + preset['bottom'] >= target_height:
+                    raise ValueError('Invalid scaled Dolby Vision active area.')
+            config_path.write_text(json.dumps(config), encoding='utf-8')
+            adjusted = work / 'adjusted.rpu'
+            command('dovi', ['editor', '-i', expected_metadata, '-j', config_path, '-o', adjusted])
+            adjusted_config = work / 'adjusted-area.json'
+            command('dovi', ['export', '-i', adjusted, '--data', f'level5={adjusted_config}'])
+            actual_area = json.loads(adjusted_config.read_text(encoding='utf-8-sig'))['active_area']
+            if any(actual_area[key] != area[key] for key in ('presets', 'edits')):
+                raise ValueError('Adjusted Dolby Vision active-area presets/ranges changed unexpectedly.')
+            adjusted_summary = command('dovi', ['info', '-i', adjusted, '--summary'], True)
+            count = re.search(r'Frames:\s*(\d+)', adjusted_summary)
+            if not count or int(count[1]) != expected_count or not re.search(r'Profile:\s*8\s*\n', adjusted_summary):
+                raise ValueError('Adjusted Dolby Vision profile/frame count changed.')
+            os.replace(adjusted, expected_metadata)
+            expected_identity = hashlib.sha256(expected_metadata.read_bytes()).hexdigest()
         source_times, _ = timestamps(source, [source_video], 'source')
         # MKVToolNix v2 timestamp extraction includes the final frame's end time.
         if len(source_times[0]) != expected_count + 1:
@@ -166,6 +209,8 @@ def run_job(job):
         encoded_times, timestamp_files = timestamps(encoded, encoded_tracks, 'encoded')
         encoded_video_index = next(index for index, track in enumerate(encoded_tracks) if track['type'] == 'video')
         encoded_video = encoded_tracks[encoded_video_index]
+        if encoded_video['properties'].get('pixel_dimensions') != f'{target_width}x{target_height}':
+            raise ValueError('Encoder output does not match the requested geometry.')
         timing = encoded_times[encoded_video_index][:-1]
         if len(timing) != expected_count or abs(timing[0] - source_times[0][0]) > 100:
             raise ValueError('Encoded video frame count/start time changed; restoration rejected.')
@@ -212,7 +257,10 @@ def run_job(job):
                  '--set', 'color-primaries=9', '--set', 'color-bits-per-channel=10',
                  '--set', f'color-range={1 if video["color_range"] == "tv" else 2}']
         for key, value in static.items():
-            edits.extend(['--set', f'{key}={value}'])
+            # Avoid scientific notation and long-decimal parsing drift in MKVToolNix.
+            value = source_video['properties'].get(key.replace('-', '_'), value)
+            rendered = format(value, '.8f').rstrip('0').rstrip('.')
+            edits.extend(['--set', f'{key}={rendered}'])
         for index, track in enumerate(encoded_tracks):
             if 'language_ietf' not in track['properties']:
                 edits.extend(['--edit', f'track:{index + 1}', '--delete', 'language-ietf'])
@@ -267,20 +315,25 @@ def run_job(job):
             raise ValueError('Restored output chapters changed.')
         final_count, final_identity = metadata(candidate, work / 'final-metadata.bin')
         if final_count != expected_count or final_identity != expected_identity:
-            raise ValueError('Restored dynamic HDR metadata does not exactly match the verified source metadata.')
+            raise ValueError('Restored dynamic HDR metadata does not exactly match the verified expected metadata.')
         output_probe = json.loads(command('ffprobe', ['-v', 'error', '-show_streams', '-of', 'json', candidate], True))
         final_video = next(stream for stream in output_probe['streams'] if stream['codec_type'] == 'video')
-        if (final_video.get('width') != job['width'] or final_video.get('height') != job['height']
+        if (final_video.get('width') != target_width or final_video.get('height') != target_height
                 or final_video.get('pix_fmt') != 'yuv420p10le' or final_video.get('color_transfer') != 'smpte2084'):
-            raise ValueError('Restored output lost native HDR10 video signaling.')
+            raise ValueError('Restored output lost the requested HDR10 video geometry/signaling.')
+        if resize and final_video.get('sample_aspect_ratio') != '1:1':
+            raise ValueError('Restored 1080p output changed the square-pixel aspect ratio.')
         if any(final_video.get(key) != video.get(key) for key in ('color_primaries', 'color_space', 'color_range')):
             raise ValueError('Restored output color signaling differs from the source.')
         final_static = static_headers(final_video.get('side_data_list', []))
-        if any(key not in final_static or abs(value - final_static[key]) > 0.000001 for key, value in static.items()):
-            raise ValueError('Restored output static HDR mastering/light metadata changed.')
+        changed_static = {key: (value, final_static.get(key)) for key, value in static.items()
+                          if key not in final_static or abs(value - final_static[key]) > 0.000001}
+        if changed_static:
+            raise ValueError(f'Restored output static HDR mastering/light metadata changed: {changed_static}')
         if job['type'] == 'dolbyVision':
             dovi = next((side for side in final_video.get('side_data_list', []) if side.get('dv_profile')), {})
-            if dovi.get('dv_profile') != 8 or dovi.get('dv_bl_signal_compatibility_id') != 1:
+            if (dovi.get('dv_profile') != 8 or dovi.get('dv_bl_signal_compatibility_id') != 1
+                    or dovi.get('rpu_present_flag') != 1 or dovi.get('bl_present_flag') != 1 or dovi.get('el_present_flag') != 0):
                 raise ValueError('Restored container must signal Dolby Vision Profile 8.1.')
         hashes = []
         for file in (encoded, candidate):

@@ -156,27 +156,34 @@ function applyVideoTrackDecision(track, context, isPrimaryVideo) {
   }
 
   if (track.hdr.hasDynamicMetadata) {
+    const resize = settings.downscale4k && track.resolution.is4k;
+    const supportedDolbyVision = track.hdr.hasDolbyVision && (track.hdr.dolbyVisionProfile === 7
+      || (track.hdr.dolbyVisionProfile === 8 && track.hdr.dolbyVisionCompatibilityId === 1));
     const canRestore = settings.hdrPolicy === 'restoreDynamic'
       && track.codec === 'hevc' && settings.targetCodec === 'hevc'
-      && settings.bitDepth === '10-Bit' && track.resolution.is4k
+      && settings.bitDepth === '10-Bit' && (track.resolution.is4k || supportedDolbyVision && track.width === 1920 && track.height === 1080)
       && context.analysis.file.container === 'mkv'
-      && !settings.downscale4k
+      && (!resize || supportedDolbyVision && track.width === 3840 && track.height === 2160)
       && track.sourceIndex === context.analysis.streams.video.items[0]?.index
       && !(track.hdr.hasDolbyVision && track.hdr.hasHdr10Plus)
-      && (!track.hdr.hasDolbyVision || track.hdr.dolbyVisionProfile === 7);
+      && (!track.hdr.hasDolbyVision || supportedDolbyVision);
 
     if (canRestore) {
       const decision = applyVideoCompatibilityDecision(track, context);
       if (decision.action === 'transcode') {
         decision.restoreDynamicHdr = true;
-        decision.reasons.push('Experimental dynamic HDR restoration will verify native-resolution metadata before accepting the encoded output. Dolby Vision requires a full-file MEL check.');
+        decision.outputWidth = resize ? 1920 : track.width;
+        decision.outputHeight = resize ? 1080 : track.height;
+        decision.reasons.push(resize
+          ? 'Dolby Vision restoration will halve active-area offsets and verify the 1080p presentation timeline before accepting the encoded output.'
+          : 'Experimental dynamic HDR restoration will verify metadata before accepting the encoded output. Dolby Vision requires Profile 7 MEL or HDR10-compatible Profile 8.1.');
       }
       return decision;
     }
     return Object.assign({}, track, {
       action: 'copy',
       reasons: [settings.hdrPolicy === 'restoreDynamic'
-        ? 'Dynamic HDR is outside the experimental native-4K restoration scope; the video will be copied so that metadata is not lost.'
+        ? 'Dynamic HDR is outside the supported restoration profile/geometry scope; the video will be copied so that metadata is not lost.'
         : `${track.hdr.type === 'dolbyVision' ? 'Dolby Vision' : 'HDR10+'} dynamic metadata requires a separate restoration workflow; the video will be copied so that metadata is not lost.`],
     });
   }

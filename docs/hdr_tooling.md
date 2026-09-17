@@ -4,10 +4,11 @@ Media Optimizer 0.1.8 adds the experimental `Compress And Restore Dynamic HDR` o
 
 ## Supported Scope
 
-- Native-resolution 4K, 10-bit HEVC, HDR10-compatible MKV input.
-- Dolby Vision Profile 7 **MEL**, verified across the full file, converted to Profile 8.1.
-- HDR10+ with metadata covering every frame in presentation order.
-- One dynamic format per file. Combined Dolby Vision + HDR10+, resizing, cropping, FEL, Profile 5, and other Dolby Vision profiles are not supported by this initial restoration path.
+- 10-bit HEVC, HDR10-compatible MKV input: native 4K restoration, plus the Dolby Vision geometry cases below.
+- Dolby Vision Profile 7 **MEL**, verified across the full file, converted to Profile 8.1; existing HDR10-compatible Profile 8.1 is also accepted.
+- With `0.1.12`, Dolby Vision square-pixel 3840x2160 input can downscale to 1920x1080 using `Normalize to 1080p` or `Downscale 4K to 1080p`. Level 5 active-area offsets are halved and frame ranges preserved; letterbox bars are not cropped. Odd offsets fail before encoding rather than being rounded. Native 1920x1080 Dolby Vision is also supported for bitrate compression; compliant files are copied without another encode.
+- Native-resolution 4K HDR10+ with metadata covering every frame in presentation order.
+- One dynamic format per file. Combined Dolby Vision + HDR10+, resized HDR10+, other resize geometries, cropping, FEL, Profile 5, and other Dolby Vision compatibility profiles are not supported. Profile 8 requires compatibility ID 1 in the scan and authoritative runtime probe.
 
 Out-of-scope planning configurations copy the video while retaining other domain changes. A full-file metadata check may reveal an unsupported input that cannot be identified from the initial scan; that job fails before encoding. Select an existing copy mode for those files. Never silently accept an HDR-less replacement.
 
@@ -70,7 +71,7 @@ No path variables are required for the standard container layout. Discovery uses
 
 ## Processing And Space
 
-1. Check tools, free space, native geometry, source metadata, and full-file frame correspondence.
+1. Check tools, free space, declared source/output geometry, source metadata, and full-file frame correspondence. For supported Dolby Vision downscaling, edit Level 5 active-area presets before encoding and verify adjusted frame counts/ranges.
 2. Encode video once with the existing complete Media Optimizer command. Keep frame passthrough and the input demuxer time base, preserving sub-frame timestamp precision instead of rounding to the encoder's default frame-rate clock. Audio, subtitles, fonts, chapters, and metadata use their existing planners/renderers.
 3. Stream-copy the smaller encoded video to HEVC, inject verified metadata, then remux it with the encoded non-video tracks.
 4. Restore the video UID/tags and static HDR color/mastering headers. Verify dynamic metadata exactly, track order/headers/tags, chapters, attachment records, packet timelines, and audio/subtitle payload hashes.
@@ -82,6 +83,6 @@ Normal failure or cancellation cleans staging. Linux children are tied to the ru
 
 ## Validation Boundary
 
-Use a separate testing library, untouched sources, and `dryRun=true` first. Confirm supported native-4K planning and verify worker-side execution before live processing.
+Use a separate testing library, untouched sources, and `dryRun=true` first. Confirm supported profile/geometry planning and verify worker-side execution before live processing. Resized Dolby Vision needs representative TV/Plex playback and HDR10-only fallback validation; structural metadata checks do not establish professional regrading or universal device compatibility.
 
 Local short-clip tests do not certify full-movie synchronization, HDR playback, hardware-specific behavior, or Tdarr custom-CLI replacement/cancellation. Keep existing modes as the rollback path until those checks pass.

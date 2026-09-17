@@ -4,6 +4,14 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ---
 
+## 2026-09-17 - Freohrskulblaka
+
+### Added verified Dolby Vision 1080p downscaling
+
+Extend the existing opt-in restoration mode to square-pixel 3840x2160-to-1920x1080 Dolby Vision resizing and HDR10-compatible Profile 8.1 input. Keep source/output geometry separate, halve Level 5 active-area offsets without cropping, retain per-frame ranges, and verify adjusted metadata before publishing. Odd offsets fail before encoding; FEL, Profile 5, other compatibility IDs, combined formats, and resized HDR10+ remain unsupported. Compliant 1080p output avoids repeat encoding. Render static-HDR header values as bounded fixed decimals to avoid MKVToolNix scientific-notation and long-decimal parsing errors on previously restored input. Existing HDR modes remain unchanged. Version: `0.1.12`.
+
+Runtime marker: `media-optimizer-dv-1080p-restore-2026-09-17-53`.
+
 ## 2026-09-16 - Freohrskulblaka
 
 ### Preserved dynamic HDR timestamp precision

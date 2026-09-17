@@ -93,7 +93,7 @@ function buildFfmpegCommand(context) {
     if (!outputPath || !path.isAbsolute(outputPath) || path.resolve(outputPath) === path.resolve(sourcePath || '.')) {
       unsupportedSteps.push('Dynamic HDR restoration requires a separate, absolute Tdarr cacheFilePath.');
     }
-    warnings.push('Experimental native-4K restoration: one video encode and four compressed-video-sized temporary writes. Unsupported or invalid metadata will fail the job without accepting the output.');
+    warnings.push('Experimental dynamic HDR restoration: one video encode and four compressed-video-sized temporary writes. Unsupported or invalid metadata will fail the job without accepting the output.');
     if (!context.settings.dryRun && plan.isValid && plan.shouldProcess && unsupportedSteps.length === 0) {
       const workDir = fs.mkdtempSync(path.join(path.dirname(outputPath), '.media-optimizer-hdr-'));
       const ffmpeg = tool('FFMPEG', [context.otherArguments?.ffmpegPath,
@@ -107,6 +107,7 @@ function buildFfmpegCommand(context) {
         version: 1, sourcePath, outputPath, workDir,
         type: restorationTrack.hdr.hasDolbyVision ? 'dolbyVision' : 'hdr10plus',
         width: restorationTrack.width, height: restorationTrack.height,
+        outputWidth: restorationTrack.outputWidth, outputHeight: restorationTrack.outputHeight,
         targetKbps: restorationTrack.bitrate.selected.targetKbps,
         inputArgs: inputArgs.map(unquote), outputArgs: outputArgs.map(unquote),
         tools: {
