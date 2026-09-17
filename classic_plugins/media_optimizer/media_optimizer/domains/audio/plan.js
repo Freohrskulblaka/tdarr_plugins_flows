@@ -32,7 +32,17 @@ function planAudio(context) {
     : configuredLanguageOrder;
   const eligibleSources = primaryTracks.filter((track) => languageOrder.includes(track.language));
   const sourceGroups = createAudioSourceGroups(eligibleSources, languageOrder);
-  const selectedTracks = selectFinalAudioTracks(eligibleSources, sourceGroups, context);
+  const selectedTracks = selectFinalAudioTracks(eligibleSources, sourceGroups, context).map((track) => {
+    if (track.hasSourceTag || !['ac3', 'aac'].includes(track.codec)) return track;
+    const group = sourceGroups.find(({language, languageVariant}) => {
+      return language === track.language && languageVariant === track.languageVariant;
+    });
+    const source = track.codec === 'ac3' && track.channelFamily === '5.1' ? group.bestSurroundSource
+      : track.codec === 'aac' && track.channelFamily === 'stereo' ? group.bestSource : null;
+    // Associate accepted legacy tracks when another change already requires a remux.
+    return source ? {...track, sourceKey: source.sourceKey,
+      sourceChannels: source.sourceChannels, sourceQualityRank: source.sourceQualityRank} : track;
+  });
   const generatedTracks = createGeneratedAudioTracks(selectedTracks, sourceGroups, context);
   const supplementalTracks = candidateTracks
     .filter((track) => languageOrder.includes(track.language))
@@ -98,6 +108,7 @@ function createAudioTrack(stream, sourceOrder, context) {
     formatKey,
     qualityRank,
     sourceKey,
+    hasSourceTag: Boolean(audioAnalysis.sourceKey),
     sourceChannels,
     sourceQualityRank,
     isCompatibility: Boolean(sourceIdentity) && (sourceChannels !== channels || sourceQualityRank !== qualityRank)
@@ -153,7 +164,8 @@ function selectFinalAudioTracks(eligibleSources, sourceGroups, context) {
 
     if (settings.createMissingFiveOne) {
       const fiveOneTrack = chooseBestAudioSource(sources.filter((track) => {
-        return track.channelFamily === '5.1' && track.codec === 'ac3' && track.sourceKey === bestSurroundSource?.sourceKey;
+        return track.channelFamily === '5.1' && track.codec === 'ac3'
+          && (!track.hasSourceTag || track.sourceKey === bestSurroundSource?.sourceKey);
       }));
 
       if (fiveOneTrack) {
@@ -163,7 +175,8 @@ function selectFinalAudioTracks(eligibleSources, sourceGroups, context) {
 
     if (settings.createMissingStereo) {
       const stereoTrack = chooseBestAudioSource(sources.filter((track) => {
-        return track.channelFamily === 'stereo' && track.codec === 'aac' && track.sourceKey === bestSource.sourceKey;
+        return track.channelFamily === 'stereo' && track.codec === 'aac'
+          && (!track.hasSourceTag || track.sourceKey === bestSource.sourceKey);
       }));
 
       if (stereoTrack) {

@@ -6,7 +6,7 @@
  * Changelog: ../../../docs/media_optimizer_changelog.md
  */
 
-const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-hdr-timestamp-precision-2026-09-16-51';
+const MEDIA_OPTIMIZER_RUNTIME_MARKER = 'media-optimizer-audio-untagged-reuse-2026-09-17-52';
 
 function loadOptimizerModules() {
   const path = require('path');
@@ -40,7 +40,7 @@ function details() {
     Type: 'Video, Audio, Subtitle',
     Operation: 'Transcode',
     Description: 'Unified media optimizer for clean, repeatable MKV outputs. Plans video copy or HEVC conversion, audio language/order cleanup, normalized compatibility tracks, commentary and descriptive-audio handling, subtitle retention and external subtitle import, font attachment preservation, chapter handling, and metadata cleanup. Original language can be resolved from filename/streams or Sonarr/Radarr through Tdarr variables, worker environment variables, or a fallback connection profile. Already-compliant files return no-process with a compact summary instead of reprocessing.',
-    Version: '0.1.10',
+    Version: '0.1.11',
     Tags: 'pre-processing, ffmpeg, media optimizer, configurable',
     Inputs: [
       {
@@ -145,7 +145,7 @@ function details() {
         },
         tooltip: `
           Select the audio channel policy.\\n
-          Compatibility 5.1 + Stereo: derives AC3 5.1 and AAC stereo from the best main soundtrack for each language variant. Existing tracks are reused when they are the best source or have matching Media Optimizer source tags.\\n
+          Compatibility 5.1 + Stereo: creates missing AC3 5.1 and AAC stereo from the best main soundtrack for each language variant. Existing qualifying main tracks are reused if untagged or associated with the selected source. Missing tags alone do not trigger processing.\\n
           Best 5.1 + Compatibility: also keeps the best Atmos, DTS-HD MA, or DTS 5.1 source.\\n
           Best 7.1 + Compatibility: also keeps the best Atmos, DTS-HD MA, or DTS 7.1 source.\\n
           Preserve All + Compatibility: retains every eligible original and adds missing AC3 5.1 and AAC stereo tracks.\\n
