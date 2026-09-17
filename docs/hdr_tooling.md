@@ -34,6 +34,7 @@ Tdarr must launch an external Python interpreter, not its own bundled executable
 Linux with the standard persistent server mount, after installing Python and placing the HDR binaries in `/app/server/tools/hdr/`:
 
 ```sh
+chmod 755 /app/server/tools/hdr/dovi_tool /app/server/tools/hdr/hdr10plus_tool
 test -e /app/server/tools/hdr/media_optimizer_hdr_ffmpeg ||
   ln -s "$(command -v python3)" /app/server/tools/hdr/media_optimizer_hdr_ffmpeg
 /app/server/tools/hdr/media_optimizer_hdr_ffmpeg --version
@@ -70,7 +71,7 @@ No path variables are required for the standard container layout. Discovery uses
 ## Processing And Space
 
 1. Check tools, free space, native geometry, source metadata, and full-file frame correspondence.
-2. Encode video once with the existing complete Media Optimizer command. Audio, subtitles, fonts, chapters, and metadata use their existing planners/renderers.
+2. Encode video once with the existing complete Media Optimizer command. Keep frame passthrough and the input demuxer time base, preserving sub-frame timestamp precision instead of rounding to the encoder's default frame-rate clock. Audio, subtitles, fonts, chapters, and metadata use their existing planners/renderers.
 3. Stream-copy the smaller encoded video to HEVC, inject verified metadata, then remux it with the encoded non-video tracks.
 4. Restore the video UID/tags and static HDR color/mastering headers. Verify dynamic metadata exactly, track order/headers/tags, chapters, attachment records, packet timelines, and audio/subtitle payload hashes.
 5. Fully decode the restored video before publishing Tdarr's cache output. Tdarr remains responsible for final source replacement.

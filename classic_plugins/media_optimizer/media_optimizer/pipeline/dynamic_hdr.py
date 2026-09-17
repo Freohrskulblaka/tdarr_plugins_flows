@@ -156,7 +156,7 @@ def run_job(job):
         print(f'Media Optimizer: encoding once; {expected_count} HDR frames verified.', flush=True)
         encoded = work / 'encoded.mkv'
         command('ffmpeg', ['-hide_banner', '-v', 'warning', '-stats', '-nostdin', '-y', '-i', source, *job['inputArgs'], *job['outputArgs'],
-                           '-fps_mode:v', 'passthrough', encoded])
+                           '-fps_mode:v', 'passthrough', '-enc_time_base:v', 'demux', encoded])
         # Refresh output statistics before taking the preservation baseline.
         command('mkvpropedit', [encoded, '--add-track-statistics-tags'])
         encoded_info = identify(encoded)
@@ -169,8 +169,11 @@ def run_job(job):
         timing = encoded_times[encoded_video_index][:-1]
         if len(timing) != expected_count or abs(timing[0] - source_times[0][0]) > 100:
             raise ValueError('Encoded video frame count/start time changed; restoration rejected.')
-        if any(abs((left - timing[0]) - (right - source_times[0][0])) > 1.1 for left, right in zip(timing, source_times[0][:-1])):
-            raise ValueError('Encoded video presentation timeline changed; restoration rejected.')
+        for index, (left, right) in enumerate(zip(timing, source_times[0][:-1])):
+            delta = (left - timing[0]) - (right - source_times[0][0])
+            if abs(delta) > 1.1:
+                raise ValueError(f'Encoded video presentation timeline changed at frame {index}: '
+                                 f'source={right}ms, encoded={left}ms, relative delta={delta:.3f}ms; restoration rejected.')
         raw = work / 'encoded.hevc'
         command('ffmpeg', ['-hide_banner', '-v', 'warning', '-stats', '-nostdin', '-y', '-i', encoded, '-map', '0:v:0', '-c:v', 'copy',
                            '-bsf:v', 'hevc_mp4toannexb', '-f', 'hevc', raw])

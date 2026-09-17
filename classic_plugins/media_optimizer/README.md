@@ -48,7 +48,7 @@ Do not replace or copy the `methods/` folder. Tdarr supplies it.
 6. Restart the Tdarr node or refresh local plugins.
 7. Add `Media Optimizer` to the target classic plugin stack, or select it through Tdarr's Run Classic Plugin flow component.
 8. Start with `dryRun=true` and `logLevel=debug` for the first validation pass.
-9. Confirm the Tdarr log shows `media-optimizer-hdr-tool-discovery-2026-09-16-50` and the expected planned track table before allowing live processing.
+9. Confirm the Tdarr log shows `media-optimizer-hdr-timestamp-precision-2026-09-16-51` and the expected planned track table before allowing live processing.
 
 Resizing uses one `scale` filter, which preserves display aspect ratio by adjusting sample aspect ratio as needed. Outputs are not forced to square pixels. Tdarr classic presets use a comma as the input/output delimiter; additional commas inside arguments can truncate the executed command even when quoted. Media Optimizer blocks such commands rather than risking lost tracks. This safeguard also applies to explicitly rendered metadata values and external input paths containing commas.
 
@@ -111,6 +111,8 @@ To roll back, stop or pause Tdarr again, remove the failed entrypoint and suppor
 The new mode supports native-resolution 4K MKV video with HDR10+, or Dolby Vision Profile 7 MEL converted to Profile 8.1. It does not resize, crop, process FEL/Profile 5, or restore combined Dolby Vision + HDR10+. Unsupported configurations stay in copy mode. A full-file check rejects unsupported metadata before encoding; restoration failures fail the job without publishing the cache output. Reuse the original source when testing this option.
 
 Version `0.1.9` discovers Tdarr's supplied/bundled tools, FFprobe beside FFmpeg, MKVToolNix through the worker PATH, and HDR tools plus the Python alias in the server's `tools/hdr/` directory. Standard container installations need no HDR path variables; overrides remain optional for custom layouts. Python and HDR binaries are installed separately, not bundled in the release.
+
+Version `0.1.10` preserves the input demuxer time base during the HDR encode, avoiding whole-frame timestamp rounding for fractional frame rates with negative audio start timestamps. Frame-count and strict timeline checks remain enforced; a mismatch reports its frame and timestamp delta.
 
 See [`../../docs/hdr_tooling.md`](../../docs/hdr_tooling.md) for worker setup, environment variables, staging space, and verification boundaries. One video encode is followed by stream-copy extraction, injection, remux, and a full video-decode check. That entails four compressed-video-sized writes, not four encodes.
 

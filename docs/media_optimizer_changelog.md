@@ -6,6 +6,12 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ## 2026-09-16 - Freohrskulblaka
 
+### Preserved dynamic HDR timestamp precision
+
+Use the source demuxer time base for the single HDR encode as well as frame passthrough. This avoids encoder-clock rounding that changes frame presentation times for 23.976-fps MKV sources with negative AAC start timestamps. Strict frame/timeline checks remain unchanged; errors now identify the first mismatching frame and relative timestamp delta. Document worker-wide executable permissions for installed HDR tools. Version: `0.1.10`.
+
+Runtime marker: `media-optimizer-hdr-timestamp-precision-2026-09-16-51`.
+
 ### Discovered dynamic HDR tools automatically
 
 Standard worker layouts no longer require HDR path environment variables. Discover the Python alias and HDR binaries in the persistent server `tools/hdr/` directory, reuse Tdarr's supplied/bundled FFmpeg and FFprobe, and locate MKVToolNix through sibling paths or worker PATH. Explicit environment overrides remain available and authoritative for custom installations. External binaries still require separate installation. Version: `0.1.9`.
