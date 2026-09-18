@@ -12,8 +12,8 @@ webhook handling and targeted `scan-files` requests remain in use.
 ## Installation
 
 1. Use the existing `ghcr.io/deathbybandaid/tdarr_inform` container.
-2. Copy `sitecustomize.py` and `explicit_routing.py` into the persistent config
-   directory under `overrides/`.
+2. Copy `sitecustomize.py`, `explicit_routing.py`, and `filename_tags.py` into the
+   persistent config directory under `overrides/`.
 3. Copy `library_routes.example.json` to `library_routes.json` in that config
    directory. Set the real source paths, Tdarr paths, and Tdarr library IDs.
    The ID is visible in the library page URL. Keep runtime configuration private.
@@ -59,3 +59,37 @@ Radarr and Sonarr import events for nonexistent files reached their explicitly
 configured libraries; Tdarr completed both targeted scans with no queued files
 or job history added. A real import from each application remains the final
 end-to-end validation step. Rename and deletion handling were not live-tested.
+
+## Optional Radarr Filename Tags
+
+Radarr's native auto-tag conditions do not match filenames. The optional
+`filename_tags.py` integration uses Tdarr Inform's existing scheduler to check
+Radarr's indexed movie filenames, without scanning media folders, refreshing
+movies, or requesting any transcodes. It is disabled when its config is absent.
+
+Copy `radarr_filename_tags.example.json` to `/config/radarr_filename_tags.json`,
+set the private connection details and filename substring, and set `enabled` to
+`true`. Use the Radarr base URL, including any URL base but not `/api/v3`.
+Restart only Tdarr Inform after deploying the updated startup hook. The job is
+visible as `Radarr filename tags` in the notifier scheduler and runs at startup
+and every 120 seconds by default.
+
+Matching is case-insensitive and checks only the filename, not the folder name;
+brackets are not required. The requested tag is created if absent and added only
+to matching movies missing it. Existing tags, monitoring, quality profiles, and
+files are untouched. Tags are not removed when a filename later stops matching.
+A renamed file becomes eligible once Radarr's database reflects the new name.
+This integration does not assign release groups or change filenames.
+
+The config is reloaded for each job. Set `enabled` to `false` to stop tagging;
+restart to change the interval. Failed checks log only the error type and retry
+on the next interval; credentials and response bodies are not logged. Keep the
+real config outside Git. The API key is sent in a header, with redirects blocked.
+
+```powershell
+python -S tools/tdarr_inform/test_filename_tags.py
+```
+
+Live validation confirmed that the startup check added the requested tag to a
+matching movie without changing its filename, existing tags, monitoring, quality
+profile, or other library settings.

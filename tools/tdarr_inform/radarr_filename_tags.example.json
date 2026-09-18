@@ -1,0 +1,8 @@
+{
+  "enabled": false,
+  "url": "http://radarr:7878",
+  "api_key": "REPLACE_WITH_PRIVATE_API_KEY",
+  "match_text": "REPLACE_WITH_YOUR_RELEASE_GROUP",
+  "tag_label": "optimized",
+  "interval_seconds": 120
+}
