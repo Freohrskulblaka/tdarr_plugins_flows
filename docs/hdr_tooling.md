@@ -71,13 +71,21 @@ No path variables are required for the standard container layout. Discovery uses
 
 ## Processing And Space
 
-1. Check tools, free space, declared source/output geometry, source metadata, and full-file frame correspondence. For supported Dolby Vision downscaling, edit Level 5 active-area presets before encoding and verify adjusted frame counts/ranges.
+1. Check tools, free space, declared source/output geometry, source metadata, and full-file frame correspondence. With `0.1.13`, cross-check static mastering/light values in source MKV headers against decoded frames of a stream-copied raw-HEVC prefix (up to 32 packets). Reject conflicting or changing sampled values before encoding rather than allowing the last frame to overwrite the baseline. For supported Dolby Vision downscaling, edit Level 5 active-area presets before encoding and verify adjusted frame counts/ranges.
 2. Encode video once with the existing complete Media Optimizer command. Keep frame passthrough and the input demuxer time base, preserving sub-frame timestamp precision instead of rounding to the encoder's default frame-rate clock. Audio, subtitles, fonts, chapters, and metadata use their existing planners/renderers.
-3. Stream-copy the smaller encoded video to HEVC, inject verified metadata, then remux it with the encoded non-video tracks.
+3. Stream-copy the smaller encoded video to HEVC, check sampled raw-frame static metadata against the source baseline, inject verified metadata, check the restored raw sample again, then remux it with the encoded non-video tracks.
 4. Restore the video UID/tags and static HDR color/mastering headers. Verify dynamic metadata exactly, track order/headers/tags, chapters, attachment records, packet timelines, and audio/subtitle payload hashes.
 5. Fully decode the restored video before publishing Tdarr's cache output. Tdarr remains responsible for final source replacement.
 
 This involves **four compressed-video-sized writes**, plus encoded audio and small metadata/timestamp files. It does not dump the original remux video or encode video four times. The space check is conservative when stream sizes are missing. Extraction and final decoding add read/processing time; do not treat a quiet verification phase as a stalled encode.
+
+The static-HDR preflight adds only a short source-video prefix, not a full source-video dump or another encode. It samples up to 32 raw packets at each bitstream boundary; it is not a full-file audit of static metadata changes. The existing full-file dynamic metadata/timeline checks and final video decode remain in place. Absent sampled SEI is allowed when metadata is carried in MKV headers; present SEI must agree with the baseline. Final MKV header checks include MKVToolNix's coordinate/light properties even when incomplete headers are omitted by FFprobe.
+
+## Conflicting Static HDR Metadata
+
+[Jellyfin FFmpeg PR #742](https://github.com/jellyfin/jellyfin-ffmpeg/pull/742) fixes a HEVC NVENC patch that rotates mastering-display RGB coordinates during serialization. Do not assume stock FFmpeg or every Jellyfin build is affected; verify the worker's exact build and a representative output. A version label alone does not prove a downstream patch revision. The runner detects conflicting sampled values and refuses publication; it does not replace FFmpeg, guess the intended mastering primaries, or automatically repair earlier outputs.
+
+If the source already has conflicting MKV/bitstream values, use a copy mode or repair it separately against an untouched, known-good reference. If an encoder introduces a conflict, use a verified corrected encoder build before retrying compression. Metadata-only repair can avoid video encoding, but remuxing still writes a new container and needs its own track/timeline validation.
 
 Normal failure or cancellation cleans staging. Linux children are tied to the runner's lifetime. A force-kill/power loss may leave a `.media-optimizer-hdr-*` cache directory; clean it only after verifying no job owns it. Windows hard-kill cleanup and worker progress/stall handling still require live Tdarr validation.
 

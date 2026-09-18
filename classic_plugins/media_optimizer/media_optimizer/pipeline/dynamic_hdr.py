@@ -88,7 +88,7 @@ def run_job(job):
             raise ValueError('HDR10+ metadata must cover every frame in presentation order.')
         return len(scenes), scenes
 
-    def static_headers(sides):
+    def static_headers(sides, properties=None):
         values = {}
         fields = {
             'Mastering display metadata': {
@@ -105,7 +105,41 @@ def run_job(job):
                 if key in side:
                     value = Fraction(side[key])
                     values[property_name] = int(value) if value.denominator == 1 else float(value)
+        properties = properties or {}
+        for key, names in {
+            'chromaticity_coordinates': [f'chromaticity-coordinates-{color}-{axis}'
+                                        for color in ('red', 'green', 'blue') for axis in ('x', 'y')],
+            'white_color_coordinates': ['white-coordinates-x', 'white-coordinates-y'],
+        }.items():
+            if key in properties:
+                coordinates = json.loads(f'[{properties[key]}]')
+                if len(coordinates) != len(names):
+                    raise ValueError('Invalid MKV static HDR coordinate header.')
+                values.update(zip(names, coordinates))
+        for mapping in fields.values():
+            for name in mapping.values():
+                if name.replace('-', '_') in properties:
+                    values[name] = properties[name.replace('-', '_')]
         return values
+
+    def verify_static_hdr(file, expected, label, allow_new=False):
+        # Raw HEVC avoids container-inherited frame metadata hiding SEI conflicts.
+        frames = json.loads(command('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-read_intervals', '%+#32',
+                            '-show_frames', '-show_entries', 'frame=side_data_list', '-of', 'json', file], True))['frames']
+        if not frames:
+            raise ValueError(f'{label} metadata probe produced no decoded video frames.')
+        baseline = dict(expected)
+        for index, frame in enumerate(frames):
+            actual = static_headers(frame.get('side_data_list', []))
+            changed = {key: (baseline.get(key), value) for key, value in actual.items()
+                       if (key not in baseline and not allow_new)
+                       or (key in baseline and abs(value - baseline[key]) > 0.000001)}
+            if changed:
+                raise ValueError(f'{label} metadata conflict at sampled frame {index}: {changed}. '
+                                 'Use a copy mode or a known-good source/encoder; do not guess RGB ordering.')
+            if allow_new:
+                baseline.update({key: value for key, value in actual.items() if key not in baseline})
+        return baseline
 
     try:
         for name in required:
@@ -141,12 +175,6 @@ def run_job(job):
         required_space = int(duration * job['targetKbps'] * 1000 / 8 * 5 + auxiliary_bound * 2)
         if duration <= 0 or job['targetKbps'] <= 0 or shutil.disk_usage(work).free < required_space:
             raise ValueError('Insufficient HDR staging space or invalid bitrate/duration.')
-        frames = json.loads(command('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-read_intervals', '%+#32',
-                            '-show_frames', '-show_entries', 'frame=side_data_list', '-of', 'json', source], True))['frames']
-        static = {}
-        for frame in frames:
-            static.update(static_headers(frame.get('side_data_list', [])))
-
         expected_metadata = work / ('expected.rpu' if job['type'] == 'dolbyVision' else 'expected.json')
         if job['type'] == 'dolbyVision':
             original_metadata = work / 'original.rpu'
@@ -159,6 +187,12 @@ def run_job(job):
                          and dovi.get('el_present_flag') == 0 and re.search(r'Profile:\s*8\s*\n', summary))
             if not mel and not profile81:
                 raise ValueError('Only full-file Dolby Vision Profile 7 MEL or HDR10-compatible Profile 8.1 is supported; use a copy mode for other profiles.')
+        source_sample = work / 'source-sample.hevc'
+        command('ffmpeg', ['-hide_banner', '-v', 'error', '-nostdin', '-y', '-i', source,
+                           '-map', '0:v:0', '-c:v', 'copy', '-frames:v', '32',
+                           '-bsf:v', 'hevc_mp4toannexb', '-f', 'hevc', source_sample])
+        static = verify_static_hdr(source_sample, static_headers(video.get('side_data_list', []), source_video['properties']),
+                                   'Source static HDR', allow_new=True)
         expected_count, expected_identity = metadata(source, expected_metadata)
         if resize:
             config_path = work / 'active-area.json'
@@ -222,12 +256,14 @@ def run_job(job):
         raw = work / 'encoded.hevc'
         command('ffmpeg', ['-hide_banner', '-v', 'warning', '-stats', '-nostdin', '-y', '-i', encoded, '-map', '0:v:0', '-c:v', 'copy',
                            '-bsf:v', 'hevc_mp4toannexb', '-f', 'hevc', raw])
+        verify_static_hdr(raw, static, 'Encoded static HDR')
         restored = work / 'restored.hevc'
         print('Media Optimizer: restoring dynamic metadata and remuxing without another encode.', flush=True)
         if job['type'] == 'dolbyVision':
             command('dovi', ['inject-rpu', '-i', raw, '--rpu-in', expected_metadata, '-o', restored])
         else:
             command('hdr10plus', ['inject', '-i', raw, '-j', expected_metadata, '-o', restored])
+        verify_static_hdr(restored, static, 'Restored static HDR')
         candidate = work / 'verified.mkv'
         properties = encoded_video['properties']
         merge_args = ['--disable-track-statistics-tags', '--disable-lacing', '-o', candidate,
@@ -258,7 +294,6 @@ def run_job(job):
                  '--set', f'color-range={1 if video["color_range"] == "tv" else 2}']
         for key, value in static.items():
             # Avoid scientific notation and long-decimal parsing drift in MKVToolNix.
-            value = source_video['properties'].get(key.replace('-', '_'), value)
             rendered = format(value, '.8f').rstrip('0').rstrip('.')
             edits.extend(['--set', f'{key}={rendered}'])
         for index, track in enumerate(encoded_tracks):
@@ -325,7 +360,7 @@ def run_job(job):
             raise ValueError('Restored 1080p output changed the square-pixel aspect ratio.')
         if any(final_video.get(key) != video.get(key) for key in ('color_primaries', 'color_space', 'color_range')):
             raise ValueError('Restored output color signaling differs from the source.')
-        final_static = static_headers(final_video.get('side_data_list', []))
+        final_static = static_headers(final_video.get('side_data_list', []), final_tracks[encoded_video_index]['properties'])
         changed_static = {key: (value, final_static.get(key)) for key, value in static.items()
                           if key not in final_static or abs(value - final_static[key]) > 0.000001}
         if changed_static:

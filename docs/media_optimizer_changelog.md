@@ -6,6 +6,12 @@ History of `../classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimize
 
 ## 2026-09-17 - Freohrskulblaka
 
+### Cross-checked static HDR metadata
+
+Compare source MKV mastering/light headers with a short raw-HEVC sample before encoding. Reject conflicting or changing sampled values instead of overwriting the baseline. Check sampled encoder/restorer SEI against that verified baseline and final container properties directly through MKVToolNix, including incomplete coordinate headers FFprobe can omit. Keep fixed-decimal rendering, container-only metadata support, one video encode, and existing dynamic-HDR/timestamp/track validation. These are bounded static-metadata checks, not automatic RGB repair or a full-file static audit. Existing copy modes remain unchanged. Version: `0.1.13`.
+
+Runtime marker: `media-optimizer-hdr-static-validation-2026-09-17-54`.
+
 ### Added verified Dolby Vision 1080p downscaling
 
 Extend the existing opt-in restoration mode to square-pixel 3840x2160-to-1920x1080 Dolby Vision resizing and HDR10-compatible Profile 8.1 input. Keep source/output geometry separate, halve Level 5 active-area offsets without cropping, retain per-frame ranges, and verify adjusted metadata before publishing. Odd offsets fail before encoding; FEL, Profile 5, other compatibility IDs, combined formats, and resized HDR10+ remain unsupported. Compliant 1080p output avoids repeat encoding. Render static-HDR header values as bounded fixed decimals to avoid MKVToolNix scientific-notation and long-decimal parsing errors on previously restored input. Existing HDR modes remain unchanged. Version: `0.1.12`.
