@@ -19,7 +19,7 @@ spec.loader.exec_module(tagging)
 class FilenameTagTests(unittest.TestCase):
     settings = {
         "url": "http://radarr:7878", "api_key": "fixture-only",
-        "match_text": "MyGroup", "tag_label": "optimized", "interval_seconds": 120,
+        "match_text": "MyGroup", "tag_label": "optimized", "interval_seconds": 1800,
     }
 
     def test_matches_filename_without_brackets_and_preserves_existing_tags(self):
@@ -62,6 +62,10 @@ class FilenameTagTests(unittest.TestCase):
             path = Path(folder) / "tags.json"
             path.write_text(json.dumps(self.settings), encoding="utf-8")
             self.assertEqual(tagging.load_settings(path), self.settings)
+            without_interval = dict(self.settings)
+            without_interval.pop("interval_seconds")
+            path.write_text(json.dumps(without_interval), encoding="utf-8")
+            self.assertEqual(tagging.load_settings(path)["interval_seconds"], 1800)
             for change in [{"match_text": ""}, {"api_key": ""}, {"interval_seconds": 1},
                            {"interval_seconds": True}, {"url": "http://user:secret@host"},
                            {"url": "http://host?api_key=secret"}]:
@@ -108,7 +112,7 @@ class FilenameTagTests(unittest.TestCase):
             with patch.object(tagging, "sync_tags", return_value=1):
                 self.assertEqual(scheduler.startup_tasks(), "original-startup")
             scheduler.remove.assert_called_once_with("Radarr filename tags")
-            scheduler.schedule.every.assert_called_once_with(120)
+            scheduler.schedule.every.assert_called_once_with(1800)
             callback = scheduler.schedule.every.return_value.seconds.do.call_args.args[0]
             with patch.object(tagging, "sync_tags", side_effect=RuntimeError("private-secret")), \
                     self.assertLogs("tagging-test", level="WARNING") as logs:

@@ -25,7 +25,7 @@ def load_settings(path):
     if (url.scheme not in ("http", "https") or not url.hostname
             or url.username or url.password or url.query or url.fragment):
         raise ValueError("Use a plain Radarr base URL without embedded credentials")
-    interval = settings.get("interval_seconds", 120)
+    interval = settings.get("interval_seconds", 1800)
     if type(interval) is not int or not 30 <= interval <= 86400:
         raise ValueError("Tagging interval must be 30 to 86400 seconds")
     settings["interval_seconds"] = interval

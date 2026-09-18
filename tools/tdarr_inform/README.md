@@ -72,7 +72,7 @@ set the private connection details and filename substring, and set `enabled` to
 `true`. Use the Radarr base URL, including any URL base but not `/api/v3`.
 Restart only Tdarr Inform after deploying the updated startup hook. The job is
 visible as `Radarr filename tags` in the notifier scheduler and runs at startup
-and every 120 seconds by default.
+and every 30 minutes by default.
 
 Matching is case-insensitive and checks only the filename, not the folder name;
 brackets are not required. The requested tag is created if absent and added only
