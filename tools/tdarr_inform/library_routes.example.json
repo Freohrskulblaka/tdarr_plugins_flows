@@ -1,0 +1,14 @@
+{
+  "routes": [
+    {
+      "source": "/data/media/movies",
+      "target": "/mnt/media/movies",
+      "library_id": "REPLACE_WITH_MOVIES_LIBRARY_ID"
+    },
+    {
+      "source": "/data/media/tv",
+      "target": "/mnt/media/tv",
+      "library_id": "REPLACE_WITH_TV_LIBRARY_ID"
+    }
+  ]
+}
