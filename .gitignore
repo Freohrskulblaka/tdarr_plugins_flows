@@ -71,6 +71,8 @@ private/
 local/
 !classic_plugins/media_optimizer/Local/
 !classic_plugins/media_optimizer/Local/Tdarr_Plugin_Media_Optimizer.js
+!classic_plugins/media_parts_extractor/Local/
+!classic_plugins/media_parts_extractor/Local/Tdarr_Plugin_Media_Parts_Extractor.js
 
 # Dependency/build output
 node_modules/

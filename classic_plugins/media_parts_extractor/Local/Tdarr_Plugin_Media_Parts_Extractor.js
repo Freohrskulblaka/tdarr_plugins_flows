@@ -2,29 +2,31 @@
  * Media Parts Extractor Classic Plugin
  * Created by: Freohrskulblaka
  * Created on: 2026-07-22
- * Description: Tdarr classic plugin entrypoint for extracting donor audio and subtitle streams into sidecar files.
+ * Description: Tdarr classic plugin entrypoint for extracting donor video, audio, and subtitle streams into sidecar files.
  */
 
-const { analyzeFile, summarizeAnalysis } = require('../media_optimizer/media_optimizer/pipeline/analyze');
-const { loadInputs, prepareConfig, createContext } = require('./media_parts_extractor/config');
-const { buildExtractionPlan } = require('./media_parts_extractor/planning');
-const { buildExtractionCommands, executeExtractionCommands } = require('./media_parts_extractor/command');
+const { analyzeFile } = require('../media_parts_extractor/pipeline/analyze');
+const { createResponse } = require('../media_parts_extractor/runtime/response');
+const { loadInputs, prepareConfig, createContext } = require('../media_parts_extractor/runtime/config');
+const { buildExtractionPlan } = require('../media_parts_extractor/pipeline/plan');
+const { buildExtractionCommands, executeExtractionCommands } = require('../media_parts_extractor/pipeline/command');
 const {
+  renderAnalysisSummary,
   renderCommandPreview,
   renderExecutionResults,
   renderExtractionPlan,
-} = require('./media_parts_extractor/formatting');
+} = require('../media_parts_extractor/pipeline/format');
 
 function details() {
   return {
     id: 'Tdarr_Plugin_Media_Parts_Extractor',
     Name: 'Media Parts Extractor',
     Stage: 'Pre-processing',
-    Type: 'Audio, Subtitle',
+    Type: 'Video, Audio, Subtitle',
     Operation: 'Transcode',
-    Description: 'Extracts donor audio and subtitle streams into sidecar files for staging-library workflows. The source media file is not rewritten.',
-    Version: '0.1.0',
-    Tags: 'pre-processing, ffmpeg, audio, subtitles, extractor, sidecars',
+    Description: 'Extracts donor video, audio, and subtitle streams into sidecar files for staging-library workflows. The source media file is not rewritten.',
+    Version: '0.2.0',
+    Tags: 'pre-processing, ffmpeg, video, audio, subtitles, extractor, sidecars',
     Inputs: [
       {
         name: 'runMode',
@@ -32,6 +34,13 @@ function details() {
         defaultValue: 'Dry Run',
         inputUI: { type: 'dropdown', options: ['Dry Run', 'Extract'] },
         tooltip: 'Dry Run logs the planned sidecar extraction. Extract runs FFmpeg directly and leaves the source file unchanged.',
+      },
+      {
+        name: 'videoMode',
+        type: 'string',
+        defaultValue: 'Primary Video',
+        inputUI: { type: 'dropdown', options: ['Primary Video', 'All Video', 'None'] },
+        tooltip: 'Select which playable video streams should be extracted as standalone MKV sidecars. Cover art and other image streams are skipped.',
       },
       {
         name: 'audioMode',
@@ -117,7 +126,7 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
   context.analysis = analyzeFile(context);
   context.plan = buildExtractionPlan(context);
 
-  context.log.info('Analysis summary', summarizeAnalysis(context.analysis));
+  context.log.info('Analysis summary', renderAnalysisSummary(context.analysis));
   context.log.section('Extraction plan');
   context.log.info(renderExtractionPlan(context.plan));
 
@@ -141,14 +150,6 @@ async function plugin(file, librarySettings, inputs, otherArguments) {
   }
 
   return createResponse(context);
-}
-
-function createResponse(context) {
-  return Object.assign({}, context.response, {
-    processFile: false,
-    preset: '',
-    infoLog: context.log.toString(),
-  });
 }
 
 module.exports.details = details;

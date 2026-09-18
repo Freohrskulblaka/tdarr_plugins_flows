@@ -5,8 +5,34 @@
  * Description: Formats planned and executed donor sidecar extraction work for Tdarr logs.
  */
 
+function renderAnalysisSummary(analysis) {
+  const summary = analysis.summary || {};
+  const lines = [
+    `Video streams: ${summary.videoStreamCount || 0}`,
+    `Audio streams: ${summary.audioStreamCount || 0}`,
+    `Subtitle streams: ${summary.subtitleStreamCount || 0}`,
+    `Attachments: ${summary.attachmentCount || 0}`,
+    `Chapters: ${summary.chapterCount || 0}`,
+  ];
+
+  if (summary.hasMultipleVideoStreams) {
+    lines.push('Multiple video streams detected.');
+  }
+
+  if (summary.hasPictureSubtitles) {
+    lines.push('Picture subtitles detected.');
+  }
+
+  return lines.join('\n');
+}
+
 function renderExtractionPlan(plan) {
   const lines = [];
+
+  lines.push(`Video streams selected: ${plan.video.count}`);
+  plan.video.items.forEach((item) => {
+    lines.push(`  - 0:${item.sourceIndex} ${item.resolution} ${item.hdrType} ${item.codec} -> ${item.outputPath}`);
+  });
 
   lines.push(`Audio streams selected: ${plan.audio.count}`);
   plan.audio.items.forEach((item) => {
@@ -51,6 +77,7 @@ function renderExecutionResults(results) {
 }
 
 module.exports = {
+  renderAnalysisSummary,
   renderCommandPreview,
   renderExecutionResults,
   renderExtractionPlan,

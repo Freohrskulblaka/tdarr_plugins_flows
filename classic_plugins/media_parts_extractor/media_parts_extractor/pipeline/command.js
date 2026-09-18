@@ -2,7 +2,7 @@
  * Media Parts Extractor Command Library
  * Created by: Freohrskulblaka
  * Created on: 2026-07-22
- * Description: Renders and optionally executes FFmpeg stream-copy extraction commands for audio and subtitle sidecars.
+ * Description: Renders and optionally executes FFmpeg stream-copy extraction commands for video, audio, and subtitle sidecars.
  */
 
 const childProcess = require('child_process');
@@ -12,6 +12,10 @@ const path = require('path');
 function buildExtractionCommands(context) {
   const sourcePath = getSourcePath(context.file);
   const commands = [];
+
+  context.plan.video.items.forEach((item) => {
+    commands.push(createStreamCopyCommand(context, sourcePath, item, 'video'));
+  });
 
   context.plan.audio.items.forEach((item) => {
     commands.push(createStreamCopyCommand(context, sourcePath, item, 'audio'));

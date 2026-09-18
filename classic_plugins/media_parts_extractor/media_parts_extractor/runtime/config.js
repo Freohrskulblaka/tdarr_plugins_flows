@@ -2,37 +2,12 @@
  * Media Parts Extractor Config Library
  * Created by: Freohrskulblaka
  * Created on: 2026-07-22
- * Description: Loads Tdarr inputs and creates runtime context for donor audio/subtitle sidecar extraction.
+ * Description: Loads Tdarr inputs and creates runtime context for donor video/audio/subtitle sidecar extraction.
  */
 
 const path = require('path');
-const { createLog } = require('./runtime/logging');
-
-function loadTdarrMethodsLib() {
-  const candidatePaths = [
-    '../methods/lib',
-    '../../methods/lib',
-    '../../../methods/lib',
-  ];
-
-  const errors = [];
-
-  for (const candidatePath of candidatePaths) {
-    try {
-      const resolvedPath = require.resolve(candidatePath);
-      return require(resolvedPath)();
-    } catch (error) {
-      if (error && error.code === 'MODULE_NOT_FOUND') {
-        errors.push(`${candidatePath}: ${error.message}`);
-        continue;
-      }
-
-      throw error;
-    }
-  }
-
-  throw new Error(`Unable to load Tdarr methods/lib from Media Parts Extractor package. Tried: ${errors.join(' | ')}`);
-}
+const { createLog } = require('./logging');
+const { loadTdarrMethodsLib } = require('./tdarr_methods');
 
 function loadInputs(inputs, details) {
   const lib = loadTdarrMethodsLib();
@@ -74,6 +49,9 @@ function prepareConfig(inputs) {
       languageOrder: {
         audio: parseList(inputs.audioLanguages),
         subtitle: parseList(inputs.subtitleLanguages),
+      },
+      video: {
+        mode: inputs.videoMode || 'Primary Video',
       },
       audio: {
         mode: inputs.audioMode || 'All',
