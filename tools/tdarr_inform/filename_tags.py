@@ -7,15 +7,21 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
+DEFAULT_SETTINGS = {
+    "interval_seconds": 300,
+}
+
+
 class NoRedirects(HTTPRedirectHandler):
     def redirect_request(self, request, response, code, message, headers, url):
         return None
 
 
 def load_settings(path):
-    settings = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(settings, dict):
+    configured = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(configured, dict):
         raise ValueError("Filename tag settings must be an object")
+    settings = dict(DEFAULT_SETTINGS, **configured)
     if settings.get("enabled") is False:
         return None
     for field in ("url", "api_key", "match_text", "tag_label"):
@@ -25,7 +31,7 @@ def load_settings(path):
     if (url.scheme not in ("http", "https") or not url.hostname
             or url.username or url.password or url.query or url.fragment):
         raise ValueError("Use a plain Radarr base URL without embedded credentials")
-    interval = settings.get("interval_seconds", 1800)
+    interval = settings["interval_seconds"]
     if type(interval) is not int or not 30 <= interval <= 86400:
         raise ValueError("Tagging interval must be 30 to 86400 seconds")
     settings["interval_seconds"] = interval
